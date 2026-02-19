@@ -7,32 +7,36 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from "node:fs"
 import { dirname, join, basename } from "node:path"
 import type { BoulderState, PlanProgress } from "./types"
-import { BOULDER_DIR, BOULDER_FILE, PROMETHEUS_PLANS_DIR } from "./constants"
+import { PROMETHEUS_PLANS_DIR } from "./constants"
+import { getBoulderFilePaths } from "./path-resolution"
 
 export function getBoulderFilePath(directory: string): string {
-  return join(directory, BOULDER_DIR, BOULDER_FILE)
+  return getBoulderFilePaths(directory).primary
 }
 
 export function readBoulderState(directory: string): BoulderState | null {
-  const filePath = getBoulderFilePath(directory)
+  const { primary, fallback } = getBoulderFilePaths(directory)
+  const candidatePaths = [primary, ...(fallback ? [fallback] : [])]
+  for (const filePath of candidatePaths) {
+    if (!existsSync(filePath)) {
+      continue
+    }
 
-  if (!existsSync(filePath)) {
-    return null
-  }
-
-  try {
-    const content = readFileSync(filePath, "utf-8")
-    const parsed = JSON.parse(content)
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    try {
+      const content = readFileSync(filePath, "utf-8")
+      const parsed = JSON.parse(content)
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        return null
+      }
+      if (!Array.isArray(parsed.session_ids)) {
+        parsed.session_ids = []
+      }
+      return parsed as BoulderState
+    } catch {
       return null
     }
-    if (!Array.isArray(parsed.session_ids)) {
-      parsed.session_ids = []
-    }
-    return parsed as BoulderState
-  } catch {
-    return null
   }
+  return null
 }
 
 export function writeBoulderState(directory: string, state: BoulderState): boolean {
@@ -69,12 +73,15 @@ export function appendSessionId(directory: string, sessionId: string): BoulderSt
 }
 
 export function clearBoulderState(directory: string): boolean {
-  const filePath = getBoulderFilePath(directory)
+  const { primary, fallback } = getBoulderFilePaths(directory)
+  const targetPaths = [primary, ...(fallback ? [fallback] : [])]
 
   try {
-    if (existsSync(filePath)) {
-      const { unlinkSync } = require("node:fs")
-      unlinkSync(filePath)
+    const { unlinkSync } = require("node:fs")
+    for (const filePath of targetPaths) {
+      if (existsSync(filePath)) {
+        unlinkSync(filePath)
+      }
     }
     return true
   } catch {
