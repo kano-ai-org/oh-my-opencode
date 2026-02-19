@@ -11,6 +11,9 @@ export const SisyphusTasksConfigSchema = z.object({
 
 export const SisyphusConfigSchema = z.object({
   tasks: SisyphusTasksConfigSchema.optional(),
+  plan_provider: z.enum(["backlog", "sisyphus", "auto"]).optional(),
+  backlog_topic_agent: z.string().optional(),
+  backlog_topic_plan_file: z.string().optional(),
 })
 
 export type SisyphusTasksConfig = z.infer<typeof SisyphusTasksConfigSchema>
