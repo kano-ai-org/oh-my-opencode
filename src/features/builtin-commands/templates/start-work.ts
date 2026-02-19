@@ -2,7 +2,7 @@ export const START_WORK_TEMPLATE = `You are starting a Sisyphus work session.
 
 ## WHAT TO DO
 
-1. **Find available plans**: Search for Prometheus-generated plan files at \`.sisyphus/plans/\`
+1. **Find available plans**: Resolve plans from configured provider (backlog topic path, legacy \`.sisyphus/plans/\`, or auto fallback)
 
 2. **Check for active boulder state**: Read \`.sisyphus/boulder.json\` if it exists
 

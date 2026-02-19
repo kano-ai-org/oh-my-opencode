@@ -149,7 +149,7 @@ export function createSessionHooks(args: {
     : null
 
   const startWork = isHookEnabled("start-work")
-    ? safeHook("start-work", () => createStartWorkHook(ctx))
+    ? safeHook("start-work", () => createStartWorkHook(ctx, pluginConfig.sisyphus))
     : null
 
   const prometheusMdOnly = isHookEnabled("prometheus-md-only")
