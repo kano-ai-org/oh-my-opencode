@@ -5,6 +5,7 @@
 export const BOULDER_DIR = ".sisyphus"
 export const BOULDER_FILE = "boulder.json"
 export const BOULDER_STATE_PATH = `${BOULDER_DIR}/${BOULDER_FILE}`
+export const BOULDER_STATE_PATH_ENV = "OMO_BOULDER_STATE_PATH"
 
 export const NOTEPAD_DIR = "notepads"
 export const NOTEPAD_BASE_PATH = `${BOULDER_DIR}/${NOTEPAD_DIR}`
