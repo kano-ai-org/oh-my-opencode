@@ -1,19 +1,25 @@
-import { statSync } from "node:fs"
 import type { PluginInput } from "@opencode-ai/plugin"
 import {
+  appendSessionId,
+  clearBoulderState,
+  createBoulderState,
+  getPlanProgress,
   readBoulderState,
   writeBoulderState,
-  appendSessionId,
-  findPrometheusPlans,
-  getPlanProgress,
-  createBoulderState,
-  getPlanName,
-  clearBoulderState,
 } from "../../features/boulder-state"
-import { log } from "../../shared/logger"
+import type { SisyphusConfig } from "../../config"
 import { updateSessionAgent } from "../../features/claude-code-session-state"
-import { detectWorktreePath } from "./worktree-detector"
+import { log } from "../../shared/logger"
 import { parseUserRequest } from "./parse-user-request"
+import {
+  buildAutoSelectedPlanMessage,
+  buildPlanAlreadyCompleteMessage,
+  buildPlanNotFoundMessage,
+  buildResumeMessage,
+} from "./start-work-context-messages"
+import { findPlansForStartWork } from "./start-work-plan-provider"
+import { buildDiscoveryContextInfo, findPlanByName, getStartWorkConfig } from "./start-work-resolver"
+import { detectWorktreePath } from "./worktree-detector"
 
 export const HOOK_NAME = "start-work" as const
 
@@ -24,14 +30,6 @@ interface StartWorkHookInput {
 
 interface StartWorkHookOutput {
   parts: Array<{ type: string; text?: string }>
-}
-
-function findPlanByName(plans: string[], requestedName: string): string | null {
-  const lowerName = requestedName.toLowerCase()
-  const exactMatch = plans.find((p) => getPlanName(p).toLowerCase() === lowerName)
-  if (exactMatch) return exactMatch
-  const partialMatch = plans.find((p) => getPlanName(p).toLowerCase().includes(lowerName))
-  return partialMatch || null
 }
 
 const MODEL_DECIDES_WORKTREE_BLOCK = `
@@ -62,7 +60,7 @@ function resolveWorktreeContext(
   }
 }
 
-export function createStartWorkHook(ctx: PluginInput) {
+export function createStartWorkHook(ctx: PluginInput, sisyphusConfig?: SisyphusConfig) {
   return {
     "chat.message": async (input: StartWorkHookInput, output: StartWorkHookOutput): Promise<void> => {
       const parts = output.parts
@@ -81,6 +79,7 @@ export function createStartWorkHook(ctx: PluginInput) {
       const existingState = readBoulderState(ctx.directory)
       const sessionId = input.sessionID
       const timestamp = new Date().toISOString()
+      const config = getStartWorkConfig(sisyphusConfig)
 
       const { planName: explicitPlanName, explicitWorktreePath } = parseUserRequest(promptText)
       const { worktreePath, block: worktreeBlock } = resolveWorktreeContext(explicitWorktreePath)
@@ -88,63 +87,40 @@ export function createStartWorkHook(ctx: PluginInput) {
       let contextInfo = ""
 
       if (explicitPlanName) {
-        log(`[${HOOK_NAME}] Explicit plan name requested: ${explicitPlanName}`, { sessionID: input.sessionID })
+        log(`[${HOOK_NAME}] Explicit plan name requested: ${explicitPlanName}`, {
+          sessionID: input.sessionID,
+        })
 
-        const allPlans = findPrometheusPlans(ctx.directory)
+        const allPlans = findPlansForStartWork({
+          directory: ctx.directory,
+          provider: config.planProvider,
+          explicitPlanName,
+          backlogAgent: config.backlogAgent,
+          backlogPlanFile: config.backlogPlanFile,
+        })
         const matchedPlan = findPlanByName(allPlans, explicitPlanName)
 
         if (matchedPlan) {
           const progress = getPlanProgress(matchedPlan)
 
           if (progress.isComplete) {
-            contextInfo = `
-## Plan Already Complete
-
-The requested plan "${getPlanName(matchedPlan)}" has been completed.
-All ${progress.total} tasks are done. Create a new plan with: /plan "your task"`
+            contextInfo = buildPlanAlreadyCompleteMessage(matchedPlan, progress.total)
           } else {
             if (existingState) clearBoulderState(ctx.directory)
             const newState = createBoulderState(matchedPlan, sessionId, "atlas", worktreePath)
             writeBoulderState(ctx.directory, newState)
 
-            contextInfo = `
-## Auto-Selected Plan
-
-**Plan**: ${getPlanName(matchedPlan)}
-**Path**: ${matchedPlan}
-**Progress**: ${progress.completed}/${progress.total} tasks
-**Session ID**: ${sessionId}
-**Started**: ${timestamp}
-${worktreeBlock}
-
-boulder.json has been created. Read the plan and begin execution.`
+            contextInfo = `${buildAutoSelectedPlanMessage({
+              planPath: matchedPlan,
+              completed: progress.completed,
+              total: progress.total,
+              sessionId,
+              timestamp,
+            })}\n${worktreeBlock}`
           }
         } else {
-          const incompletePlans = allPlans.filter((p) => !getPlanProgress(p).isComplete)
-          if (incompletePlans.length > 0) {
-            const planList = incompletePlans
-              .map((p, i) => {
-                const prog = getPlanProgress(p)
-                return `${i + 1}. [${getPlanName(p)}] - Progress: ${prog.completed}/${prog.total}`
-              })
-              .join("\n")
-
-            contextInfo = `
-## Plan Not Found
-
-Could not find a plan matching "${explicitPlanName}".
-
-Available incomplete plans:
-${planList}
-
-Ask the user which plan to work on.`
-          } else {
-            contextInfo = `
-## Plan Not Found
-
-Could not find a plan matching "${explicitPlanName}".
-No incomplete plans available. Create a new plan with: /plan "your task"`
-          }
+          const incompletePlans = allPlans.filter((planPath) => !getPlanProgress(planPath).isComplete)
+          contextInfo = buildPlanNotFoundMessage(explicitPlanName, incompletePlans)
         }
       } else if (existingState) {
         const progress = getPlanProgress(existingState.active_plan)
@@ -167,19 +143,15 @@ No incomplete plans available. Create a new plan with: /plan "your task"`
 
           const worktreeDisplay = effectiveWorktree ? `\n**Worktree**: ${effectiveWorktree}` : worktreeBlock
 
-          contextInfo = `
-## Active Work Session Found
-
-**Status**: RESUMING existing work
-**Plan**: ${existingState.plan_name}
-**Path**: ${existingState.active_plan}
-**Progress**: ${progress.completed}/${progress.total} tasks completed
-**Sessions**: ${existingState.session_ids.length + 1} (current session appended)
-**Started**: ${existingState.started_at}
-${worktreeDisplay}
-
-The current session (${sessionId}) has been added to session_ids.
-Read the plan file and continue from the first unchecked task.`
+          contextInfo = `${buildResumeMessage({
+            planName: existingState.plan_name,
+            planPath: existingState.active_plan,
+            completed: progress.completed,
+            total: progress.total,
+            existingSessionCount: existingState.session_ids.length,
+            startedAt: existingState.started_at,
+            sessionId,
+          })}${worktreeDisplay}`
         } else {
           contextInfo = `
 ## Previous Work Complete
@@ -193,62 +165,15 @@ Looking for new plans...`
         (!existingState && !explicitPlanName) ||
         (existingState && !explicitPlanName && getPlanProgress(existingState.active_plan).isComplete)
       ) {
-        const plans = findPrometheusPlans(ctx.directory)
-        const incompletePlans = plans.filter((p) => !getPlanProgress(p).isComplete)
-
-        if (plans.length === 0) {
-          contextInfo += `
-## No Plans Found
-
-No Prometheus plan files found at .sisyphus/plans/
-Use Prometheus to create a work plan first: /plan "your task"`
-        } else if (incompletePlans.length === 0) {
-          contextInfo += `
-
-## All Plans Complete
-
-All ${plans.length} plan(s) are complete. Create a new plan with: /plan "your task"`
-        } else if (incompletePlans.length === 1) {
-          const planPath = incompletePlans[0]
-          const progress = getPlanProgress(planPath)
-          const newState = createBoulderState(planPath, sessionId, "atlas", worktreePath)
-          writeBoulderState(ctx.directory, newState)
-
-          contextInfo += `
-
-## Auto-Selected Plan
-
-**Plan**: ${getPlanName(planPath)}
-**Path**: ${planPath}
-**Progress**: ${progress.completed}/${progress.total} tasks
-**Session ID**: ${sessionId}
-**Started**: ${timestamp}
-${worktreeBlock}
-
-boulder.json has been created. Read the plan and begin execution.`
-        } else {
-          const planList = incompletePlans
-            .map((p, i) => {
-              const progress = getPlanProgress(p)
-              const modified = new Date(statSync(p).mtimeMs).toISOString()
-              return `${i + 1}. [${getPlanName(p)}] - Modified: ${modified} - Progress: ${progress.completed}/${progress.total}`
-            })
-            .join("\n")
-
-          contextInfo += `
-
-<system-reminder>
-## Multiple Plans Found
-
-Current Time: ${timestamp}
-Session ID: ${sessionId}
-
-${planList}
-
-Ask the user which plan to work on. Present the options above and wait for their response.
-${worktreeBlock}
-</system-reminder>`
-        }
+        const discoveryInfo = buildDiscoveryContextInfo({
+          directory: ctx.directory,
+          sessionId,
+          timestamp,
+          planProvider: config.planProvider,
+          backlogAgent: config.backlogAgent,
+          backlogPlanFile: config.backlogPlanFile,
+        })
+        contextInfo += `\n\n${discoveryInfo}\n${worktreeBlock}`
       }
 
       const idx = output.parts.findIndex((p) => p.type === "text" && p.text)
