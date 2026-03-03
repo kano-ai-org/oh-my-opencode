@@ -23,6 +23,43 @@ describe("start-work plan provider", () => {
     const scriptPath = join(
       testDir,
       ".agents",
+      "kano",
+      "kano-agent-backlog-skill",
+      "scripts",
+      "kano-backlog",
+    )
+    mkdirSync(join(scriptPath, ".."), { recursive: true })
+    writeFileSync(scriptPath, "#!/usr/bin/env python\n")
+
+    const pythonPath = join(testDir, ".venv", "bin", "python")
+    mkdirSync(join(pythonPath, ".."), { recursive: true })
+    writeFileSync(pythonPath, "#!/usr/bin/env python\n")
+
+    const resolvedPath = join(testDir, "_kano", "backlog", "topics", "my-topic", "plan.md")
+    const execSpy = spyOn(childProcess, "execFileSync").mockImplementation(() =>
+      JSON.stringify({ plan_path: resolvedPath, provider: "backlog" })
+    )
+
+    const result = findPlansForStartWork({
+      directory: testDir,
+      provider: "backlog",
+      explicitPlanName: "my-topic",
+      backlogAgent: "atlas",
+      backlogPlanFile: "plan.md",
+    })
+
+    expect(result).toEqual([resolvedPath])
+    const [, args] = execSpy.mock.calls[0] as [string, string[]]
+    expect(args).toContain("topic")
+    expect(args).toContain("resolve-opencode-plan")
+    expect(args).toContain("my-topic")
+    execSpy.mockRestore()
+  })
+
+  test("supports legacy .agents/skills/kano backlog script path", () => {
+    const scriptPath = join(
+      testDir,
+      ".agents",
       "skills",
       "kano",
       "kano-agent-backlog-skill",

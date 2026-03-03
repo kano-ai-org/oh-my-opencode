@@ -29,16 +29,26 @@ function resolvePythonCommand(directory: string): string | null {
 }
 
 function resolveBacklogScript(directory: string): string | null {
-  const scriptPath = join(
-    directory,
-    ".agents",
-    "skills",
-    "kano",
-    "kano-agent-backlog-skill",
-    "scripts",
-    "kano-backlog",
-  )
-  return existsSync(scriptPath) ? scriptPath : null
+  const candidates = [
+    join(
+      directory,
+      ".agents",
+      "kano",
+      "kano-agent-backlog-skill",
+      "scripts",
+      "kano-backlog",
+    ),
+    join(
+      directory,
+      ".agents",
+      "skills",
+      "kano",
+      "kano-agent-backlog-skill",
+      "scripts",
+      "kano-backlog",
+    ),
+  ]
+  return candidates.find((candidate) => existsSync(candidate)) ?? null
 }
 
 function parseResolvedPlan(stdout: string): ResolvePlanResult | null {
