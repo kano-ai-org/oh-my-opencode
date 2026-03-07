@@ -4998,6 +4998,20 @@
             "claude_code_compat"
           ],
           "additionalProperties": false
+        },
+        "plan_provider": {
+          "type": "string",
+          "enum": [
+            "backlog",
+            "sisyphus",
+            "auto"
+          ]
+        },
+        "backlog_topic_agent": {
+          "type": "string"
+        },
+        "backlog_topic_plan_file": {
+          "type": "string"
         }
       },
       "additionalProperties": false
