@@ -1,6 +1,7 @@
-export function createSystemTransformHandler(): (
-  input: { sessionID?: string; model: { id: string; providerID: string; [key: string]: unknown } },
-  output: { system: string[] },
-) => Promise<void> {
-  return async (): Promise<void> => {}
+import type { PluginInterface } from "./types"
+
+type SystemTransformHook = NonNullable<PluginInterface["experimental.chat.system.transform"]>
+
+export function createSystemTransformHandler(): SystemTransformHook {
+  return async (_input, _output): Promise<void> => {}
 }
