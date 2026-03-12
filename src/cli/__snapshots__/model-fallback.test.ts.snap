@@ -800,14 +800,14 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models when 
       "variant": "max",
     },
     "momus": {
-      "model": "github-copilot/gpt-5.4",
-      "variant": "xhigh",
+      "model": "github-copilot/claude-opus-4.6",
+      "variant": "max",
     },
     "multimodal-looker": {
       "model": "github-copilot/gpt-5-nano",
     },
     "oracle": {
-      "model": "github-copilot/gpt-5.4",
+      "model": "github-copilot/gemini-3.1-pro-preview",
       "variant": "high",
     },
     "prometheus": {
@@ -870,14 +870,14 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models with 
       "variant": "max",
     },
     "momus": {
-      "model": "github-copilot/gpt-5.4",
-      "variant": "xhigh",
+      "model": "github-copilot/claude-opus-4.6",
+      "variant": "max",
     },
     "multimodal-looker": {
       "model": "github-copilot/gpt-5-nano",
     },
     "oracle": {
-      "model": "github-copilot/gpt-5.4",
+      "model": "github-copilot/gemini-3.1-pro-preview",
       "variant": "high",
     },
     "prometheus": {
@@ -1340,7 +1340,7 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
       "variant": "max",
     },
     "momus": {
-      "model": "github-copilot/gpt-5.4",
+      "model": "opencode/gpt-5.4",
       "variant": "xhigh",
     },
     "multimodal-looker": {
@@ -1348,7 +1348,7 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
       "variant": "medium",
     },
     "oracle": {
-      "model": "github-copilot/gpt-5.4",
+      "model": "opencode/gpt-5.4",
       "variant": "high",
     },
     "prometheus": {

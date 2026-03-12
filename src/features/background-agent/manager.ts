@@ -116,6 +116,16 @@ interface QueueItem {
   input: LaunchInput
 }
 
+function isRetryableNotificationDispatchError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error)
+  const lowered = message.toLowerCase()
+  return (
+    lowered.includes("unexpected eof")
+    || lowered.includes("json parse error")
+    || lowered.includes("socket connection was closed unexpectedly")
+  )
+}
+
 export interface SubagentSessionCreatedEvent {
   sessionID: string
   parentID: string
@@ -1675,17 +1685,19 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
           resolvedModel: model,
         })
 
+        const promptPayload = {
+          path: { id: task.parentSessionID },
+          body: {
+            noReply: !allComplete,
+            ...(agent !== undefined ? { agent } : {}),
+            ...(model !== undefined ? { model } : {}),
+            ...(resolvedTools ? { tools: resolvedTools } : {}),
+            parts: [createInternalAgentTextPart(notification)],
+          },
+        }
+
         try {
-          await this.client.session.promptAsync({
-            path: { id: task.parentSessionID },
-            body: {
-              noReply: !allComplete,
-              ...(agent !== undefined ? { agent } : {}),
-              ...(model !== undefined ? { model } : {}),
-              ...(resolvedTools ? { tools: resolvedTools } : {}),
-              parts: [createInternalAgentTextPart(notification)],
-            },
-          })
+          await this.client.session.promptAsync(promptPayload)
           log("[background-agent] Sent notification to parent session:", {
             taskId: task.id,
             allComplete,
@@ -1698,6 +1710,25 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
               parentSessionID: task.parentSessionID,
             })
             this.queuePendingNotification(task.parentSessionID, notification)
+          } else if (isRetryableNotificationDispatchError(error)) {
+            log("[background-agent] Retrying parent notification with prompt after promptAsync transport failure:", {
+              taskId: task.id,
+              parentSessionID: task.parentSessionID,
+              error: String(error),
+            })
+            try {
+              await this.client.session.prompt(promptPayload)
+              log("[background-agent] Retried notification to parent session with prompt:", {
+                taskId: task.id,
+                allComplete,
+                noReply: !allComplete,
+              })
+            } catch (retryError) {
+              if (isAbortedSessionError(retryError) || isRetryableNotificationDispatchError(retryError)) {
+                this.queuePendingNotification(task.parentSessionID, notification)
+              }
+              log("[background-agent] Failed to retry parent notification:", retryError)
+            }
           } else {
             log("[background-agent] Failed to send notification:", error)
           }

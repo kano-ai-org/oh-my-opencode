@@ -1111,6 +1111,51 @@ describe("BackgroundManager.notifyParentSession - aborted parent", () => {
 
     manager.shutdown()
   })
+
+  test("should retry notification with prompt when promptAsync transport closes unexpectedly", async () => {
+    //#given
+    let promptAsyncCalls = 0
+    let promptCalls = 0
+    const client = {
+      session: {
+        prompt: async () => {
+          promptCalls += 1
+          return {}
+        },
+        promptAsync: async () => {
+          promptAsyncCalls += 1
+          throw new Error("The socket connection was closed unexpectedly.")
+        },
+        abort: async () => ({}),
+        messages: async () => ({ data: [] }),
+      },
+    }
+    const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
+    const task: BackgroundTask = {
+      id: "task-transport-retry",
+      sessionID: "session-child",
+      parentSessionID: "session-parent",
+      parentMessageID: "msg-parent",
+      description: "task transport retry",
+      prompt: "test",
+      agent: "explore",
+      status: "completed",
+      startedAt: new Date(),
+      completedAt: new Date(),
+    }
+    getPendingByParent(manager).set("session-parent", new Set([task.id]))
+
+    //#when
+    await (manager as unknown as { notifyParentSession: (task: BackgroundTask) => Promise<void> })
+      .notifyParentSession(task)
+
+    //#then
+    expect(promptAsyncCalls).toBe(1)
+    expect(promptCalls).toBe(1)
+    expect(getPendingNotifications(manager).get("session-parent")).toBeUndefined()
+
+    manager.shutdown()
+  })
 })
 
 describe("BackgroundManager.notifyParentSession - notifications toggle", () => {

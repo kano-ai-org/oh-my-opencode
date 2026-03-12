@@ -160,6 +160,29 @@ describe("Sisyphus-Junior model inheritance", () => {
       "openai/gpt-5.3-codex"
     )
   })
+
+  test("sanitizes github-copilot/gpt-5.4 current model before agent wiring", async () => {
+    // #given
+    const pluginConfig: OhMyOpenCodeConfig = {}
+    const config: Record<string, unknown> = {
+      model: "github-copilot/gpt-5.4",
+      agent: {},
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    // #when
+    await handler(config)
+
+    // #then
+    expect(config.model).toBe("github-copilot/gpt-5-mini")
+  })
 })
 
 describe("Plan agent demote behavior", () => {

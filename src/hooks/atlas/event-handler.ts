@@ -1,9 +1,18 @@
 import type { PluginInput } from "@opencode-ai/plugin"
+import { getPlanProgress, readBoulderState } from "../../features/boulder-state"
+import { getSessionAgent, subagentSessions } from "../../features/claude-code-session-state"
 import { log } from "../../shared/logger"
+import { getAgentConfigKey } from "../../shared/agent-display-names"
 import { HOOK_NAME } from "./hook-name"
+import { handleAtlasIdleEvent } from "./idle-event-handler"
 import { isAbortError } from "./is-abort-error"
-import { handleAtlasSessionIdle } from "./idle-event"
+import { injectBoulderContinuation } from "./boulder-continuation-injector"
+import { getLastAgentFromSession } from "./session-last-agent"
 import type { AtlasHookOptions, SessionState } from "./types"
+
+const CONTINUATION_COOLDOWN_MS = 5000
+const FAILURE_BACKOFF_MS = 5 * 60 * 1000
+const RETRY_DELAY_MS = CONTINUATION_COOLDOWN_MS + 1000
 
 export function createAtlasEventHandler(input: {
   ctx: PluginInput
@@ -31,22 +40,25 @@ export function createAtlasEventHandler(input: {
     if (event.type === "session.idle") {
       const sessionID = props?.sessionID as string | undefined
       if (!sessionID) return
-      await handleAtlasSessionIdle({ ctx, options, getState, sessionID })
+
+      log(`[${HOOK_NAME}] session.idle`, { sessionID })
+      await handleAtlasIdleEvent({
+        ctx,
+        options,
+        sessionID,
+        state: getState(sessionID),
+      })
       return
     }
 
     if (event.type === "message.updated") {
       const info = props?.info as Record<string, unknown> | undefined
       const sessionID = info?.sessionID as string | undefined
-      const role = info?.role as string | undefined
       if (!sessionID) return
 
       const state = sessions.get(sessionID)
       if (state) {
         state.lastEventWasAbortError = false
-        if (role === "user") {
-          state.waitingForFinalWaveApproval = false
-        }
       }
       return
     }
