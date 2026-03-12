@@ -30,6 +30,22 @@ type AgentConfigRecord = Record<string, Record<string, unknown> | undefined> & {
   plan?: Record<string, unknown>;
 };
 
+function sanitizeUnsupportedUiModel(model: string | undefined): string | undefined {
+  if (!model) return model;
+
+  const normalized = model.trim().toLowerCase();
+  if (
+    normalized === "github-copilot/gpt-5.4"
+    || normalized === "github-copilot/gpt-5-4"
+    || normalized.startsWith("github-copilot/gpt-5.4-")
+    || normalized.startsWith("github-copilot/gpt-5-4-")
+  ) {
+    return "github-copilot/gpt-5-mini";
+  }
+
+  return model;
+}
+
 function getConfiguredDefaultAgent(config: Record<string, unknown>): string | undefined {
   const defaultAgent = config.default_agent;
   if (typeof defaultAgent !== "string") return undefined;
@@ -88,7 +104,15 @@ export async function applyAgentConfig(params: {
 
   const browserProvider =
     params.pluginConfig.browser_automation_engine?.provider ?? "playwright";
-  const currentModel = params.config.model as string | undefined;
+  const rawCurrentModel = params.config.model as string | undefined;
+  const currentModel = sanitizeUnsupportedUiModel(rawCurrentModel);
+  if (currentModel !== rawCurrentModel) {
+    params.config.model = currentModel;
+    log("[config-handler] sanitized unsupported UI model", {
+      from: rawCurrentModel,
+      to: currentModel,
+    });
+  }
   const disabledSkills = new Set<string>(params.pluginConfig.disabled_skills ?? []);
   const useTaskSystem = isTaskSystemEnabled(params.pluginConfig);
   const disableOmoEnv = params.pluginConfig.experimental?.disable_omo_env ?? false;

@@ -126,6 +126,16 @@ interface QueueItem {
   input: LaunchInput
 }
 
+function isRetryableNotificationDispatchError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error)
+  const lowered = message.toLowerCase()
+  return (
+    lowered.includes("unexpected eof")
+    || lowered.includes("json parse error")
+    || lowered.includes("socket connection was closed unexpectedly")
+  )
+}
+
 export interface SubagentSessionCreatedEvent {
   sessionID: string
   parentID: string
@@ -608,7 +618,6 @@ export class BackgroundManager {
           log("[background-agent] Fallback agent also failed:", retryError)
         }
       }
-
       log("[background-agent] promptAsync error:", error)
       const existingTask = this.findBySession(sessionID)
       if (existingTask) {
@@ -892,7 +901,7 @@ export class BackgroundManager {
         })(),
         parts: [createInternalAgentTextPart(input.prompt)],
       },
-    }).catch(async (error) => {
+    }).catch((error) => {
       log("[background-agent] resume prompt error:", error)
       existingTask.status = "interrupt"
       const errorMessage = error instanceof Error ? error.message : String(error)
@@ -911,7 +920,6 @@ export class BackgroundManager {
       removeTaskToastTracking(existingTask.id)
 
       // Abort the session to prevent infinite polling hang
-      // Awaited to prevent dangling promise during subagent teardown (Bun/WebKit SIGABRT)
       if (existingTask.sessionID) {
         await this.abortSessionWithLogging(existingTask.sessionID, "resume error cleanup")
       }
@@ -1730,8 +1738,6 @@ export class BackgroundManager {
     this.completedTaskSummaries.get(task.parentSessionID)!.push({
       id: task.id,
       description: task.description,
-      status: task.status,
-      error: task.error,
     })
 
     // Update pending tracking and check if all tasks complete
@@ -1753,7 +1759,7 @@ export class BackgroundManager {
     }
 
     const completedTasks = allComplete
-      ? (this.completedTaskSummaries.get(task.parentSessionID) ?? [{ id: task.id, description: task.description, status: task.status, error: task.error }])
+      ? (this.completedTaskSummaries.get(task.parentSessionID) ?? [{ id: task.id, description: task.description }])
       : []
 
     if (allComplete) {
@@ -1834,28 +1840,31 @@ export class BackgroundManager {
           resolvedModel: model,
         })
 
-        const isTaskFailure = task.status === "error" || task.status === "cancelled" || task.status === "interrupt"
-        const shouldReply = allComplete || isTaskFailure
+        const promptPayload = {
+          path: { id: task.parentSessionID },
+          body: {
+            noReply: !allComplete,
+            ...(agent !== undefined ? { agent } : {}),
+            ...(model !== undefined ? { model } : {}),
+            ...(resolvedTools ? { tools: resolvedTools } : {}),
+            parts: [createInternalAgentTextPart(notification)],
+          },
+        }
 
         const variant = promptContext?.model?.variant
 
         try {
           await this.client.session.promptAsync({
-            path: { id: task.parentSessionID },
+            ...promptPayload,
             body: {
-              noReply: !shouldReply,
-              ...(agent !== undefined ? { agent } : {}),
-              ...(model !== undefined ? { model } : {}),
+              ...promptPayload.body,
               ...(variant !== undefined ? { variant } : {}),
-              ...(resolvedTools ? { tools: resolvedTools } : {}),
-              parts: [createInternalAgentTextPart(notification)],
             },
           })
           log("[background-agent] Sent notification to parent session:", {
             taskId: task.id,
             allComplete,
-            isTaskFailure,
-            noReply: !shouldReply,
+            noReply: !allComplete,
           })
         } catch (error) {
           if (isAbortedSessionError(error)) {
@@ -1864,6 +1873,25 @@ export class BackgroundManager {
               parentSessionID: task.parentSessionID,
             })
             this.queuePendingNotification(task.parentSessionID, notification)
+          } else if (isRetryableNotificationDispatchError(error)) {
+            log("[background-agent] Retrying parent notification with prompt after promptAsync transport failure:", {
+              taskId: task.id,
+              parentSessionID: task.parentSessionID,
+              error: String(error),
+            })
+            try {
+              await this.client.session.prompt(promptPayload)
+              log("[background-agent] Retried notification to parent session with prompt:", {
+                taskId: task.id,
+                allComplete,
+                noReply: !allComplete,
+              })
+            } catch (retryError) {
+              if (isAbortedSessionError(retryError) || isRetryableNotificationDispatchError(retryError)) {
+                this.queuePendingNotification(task.parentSessionID, notification)
+              }
+              log("[background-agent] Failed to retry parent notification:", retryError)
+            }
           } else {
             log("[background-agent] Failed to send notification:", error)
           }
@@ -1891,7 +1919,6 @@ export class BackgroundManager {
     pruneStaleTasksAndNotifications({
       tasks: this.tasks,
       notifications: this.notifications,
-      taskTtlMs: this.config?.taskTtlMs,
       onTaskPruned: (taskId, task, errorMessage) => {
         const wasPending = task.status === "pending"
         log("[background-agent] Pruning stale task:", { taskId, status: task.status, age: Math.round(((wasPending ? task.queuedAt?.getTime() : task.startedAt?.getTime()) ? (Date.now() - (wasPending ? task.queuedAt!.getTime() : task.startedAt!.getTime())) : 0) / 1000) + "s" })
@@ -1954,48 +1981,6 @@ export class BackgroundManager {
     })
   }
 
-  private async verifySessionExists(sessionID: string): Promise<boolean> {
-    return verifySessionStillExists(this.client, sessionID)
-  }
-
-  private async failCrashedTask(task: BackgroundTask, errorMessage: string): Promise<void> {
-    task.status = "error"
-    task.error = errorMessage
-    task.completedAt = new Date()
-    if (task.rootSessionID) {
-      this.unregisterRootDescendant(task.rootSessionID)
-    }
-    this.taskHistory.record(task.parentSessionID, { id: task.id, sessionID: task.sessionID, agent: task.agent, description: task.description, status: "error", category: task.category, startedAt: task.startedAt, completedAt: task.completedAt })
-    if (task.concurrencyKey) {
-      this.concurrencyManager.release(task.concurrencyKey)
-      task.concurrencyKey = undefined
-    }
-
-    const completionTimer = this.completionTimers.get(task.id)
-    if (completionTimer) {
-      clearTimeout(completionTimer)
-      this.completionTimers.delete(task.id)
-    }
-    const idleTimer = this.idleDeferralTimers.get(task.id)
-    if (idleTimer) {
-      clearTimeout(idleTimer)
-      this.idleDeferralTimers.delete(task.id)
-    }
-
-    this.cleanupPendingByParent(task)
-    this.clearNotificationsForTask(task.id)
-    removeTaskToastTracking(task.id)
-    this.scheduleTaskRemoval(task.id)
-    if (task.sessionID) {
-      SessionCategoryRegistry.remove(task.sessionID)
-    }
-
-    this.markForNotification(task)
-    this.enqueueNotificationForParent(task.parentSessionID, () => this.notifyParentSession(task)).catch(err => {
-      log("[background-agent] Error in notifyParentSession for crashed task:", { taskId: task.id, error: err })
-    })
-  }
-
   private async pollRunningTasks(): Promise<void> {
     if (this.pollingInFlight) return
     this.pollingInFlight = true
@@ -2052,24 +2037,11 @@ export class BackgroundManager {
         }
 
         // Session is idle or no longer in status response (completed/disappeared)
-        const sessionGoneFromStatus = !sessionStatus
-        const sessionGoneThresholdReached = sessionGoneFromStatus
-          && (task.consecutiveMissedPolls ?? 0) >= MIN_SESSION_GONE_POLLS
         const completionSource = sessionStatus?.type === "idle"
           ? "polling (idle status)"
           : "polling (session gone from status)"
         const hasValidOutput = await this.validateSessionHasOutput(sessionID)
         if (!hasValidOutput) {
-          if (sessionGoneThresholdReached) {
-            const sessionExists = await this.verifySessionExists(sessionID)
-            if (!sessionExists) {
-              log("[background-agent] Session no longer exists (crashed), marking task as error:", task.id)
-              await this.failCrashedTask(task, "Subagent session no longer exists (process likely crashed). The session disappeared without producing any output.")
-              continue
-            }
-
-            task.consecutiveMissedPolls = 0
-          }
           log("[background-agent] Polling idle/gone but no valid output yet, waiting:", task.id)
           continue
         }
