@@ -5,25 +5,26 @@ import {
 import type { FallbackModelObject } from "../config/schema/fallback-models"
 import type { FallbackEntry } from "../shared/model-requirements"
 import type { InstallConfig } from "./types"
-
 import type { AgentConfig, CategoryConfig, GeneratedOmoConfig } from "./model-fallback-types"
 import { applyOpenAiOnlyModelCatalog, isOpenAiOnlyAvailability } from "./openai-only-model-catalog"
 import { isProviderAvailable, toProviderAvailability } from "./provider-availability"
 import {
-	getSisyphusFallbackChain,
-	isAnyFallbackEntryAvailable,
-	isRequiredModelAvailable,
-	isRequiredProviderAvailable,
-	resolveModelFromChain,
+  getSisyphusFallbackChain,
+  isAnyFallbackEntryAvailable,
+  isRequiredModelAvailable,
+  isRequiredProviderAvailable,
+  resolveModelFromChain,
 } from "./fallback-chain-resolution"
 import { transformModelForProvider } from "./provider-model-id-transform"
 
 export type { GeneratedOmoConfig } from "./model-fallback-types"
 
-const ZAI_MODEL = "zai-coding-plan/glm-4.7"
+const MINIMAX_MODEL = "minimax/minimax-m2.7"
+const OPENCODE_GO_MODEL = "opencode-go/minimax-m2.7"
+const ZAI_MODEL = "zai-coding-plan/glm-5"
 
-const ULTIMATE_FALLBACK = "opencode/gpt-5-nano"
-const SCHEMA_URL = "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json"
+const ULTIMATE_FALLBACK = "opencode/big-pickle"
+const SCHEMA_URL = "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/dev/assets/oh-my-opencode.schema.json"
 
 function toFallbackModelObject(entry: FallbackEntry, provider: string): FallbackModelObject {
   return {
@@ -93,7 +94,9 @@ function attachAllFallbackModels<T extends AgentConfig | CategoryConfig>(
   }
 }
 
-
+function resolveMiniMaxAgentConfig(req: { fallbackChain: FallbackEntry[] }): AgentConfig {
+  return { model: MINIMAX_MODEL }
+}
 
 export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
   const avail = toProviderAvailability(config)
@@ -103,9 +106,11 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
     avail.native.gemini ||
     avail.opencodeZen ||
     avail.copilot ||
+    avail.minimaxCodingPlan ||
     avail.zai ||
     avail.kimiForCoding ||
     avail.opencodeGo
+
   if (!hasAnyProvider) {
     return {
       $schema: SCHEMA_URL,
@@ -127,10 +132,13 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
     if (role === "librarian") {
       let agentConfig: AgentConfig | undefined
       if (avail.opencodeGo) {
-        agentConfig = { model: "opencode-go/minimax-m2.7" }
+        agentConfig = { model: OPENCODE_GO_MODEL }
+      } else if (avail.minimaxCodingPlan) {
+        agentConfig = resolveMiniMaxAgentConfig(req)
       } else if (avail.zai) {
         agentConfig = { model: ZAI_MODEL }
       }
+
       if (agentConfig) {
         agents[role] = attachAllFallbackModels(agentConfig, req.fallbackChain, avail)
       }
@@ -144,7 +152,9 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
       } else if (avail.opencodeZen) {
         agentConfig = { model: "opencode/claude-haiku-4-5" }
       } else if (avail.opencodeGo) {
-        agentConfig = { model: "opencode-go/minimax-m2.7" }
+        agentConfig = { model: OPENCODE_GO_MODEL }
+      } else if (avail.minimaxCodingPlan) {
+        agentConfig = resolveMiniMaxAgentConfig(req)
       } else if (avail.copilot) {
         agentConfig = { model: "github-copilot/gpt-5-mini" }
       } else {
@@ -186,7 +196,6 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
   }
 
   for (const [cat, req] of Object.entries(CLI_CATEGORY_MODEL_REQUIREMENTS)) {
-    // Special case: unspecified-high downgrades to unspecified-low when not isMaxPlan
     const fallbackChain =
       cat === "unspecified-high" && !avail.isMaxPlan
         ? CLI_CATEGORY_MODEL_REQUIREMENTS["unspecified-low"].fallbackChain

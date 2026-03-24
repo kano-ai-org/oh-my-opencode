@@ -30,6 +30,7 @@ program
   .option("--gemini <value>", "Gemini integration: no, yes")
   .option("--copilot <value>", "GitHub Copilot subscription: no, yes")
   .option("--opencode-zen <value>", "OpenCode Zen access: no, yes (default: no)")
+  .option("--minimax-coding-plan <value>", "MiniMax Coding Plan subscription: no, yes")
   .option("--zai-coding-plan <value>", "Z.ai Coding Plan subscription: no, yes (default: no)")
   .option("--kimi-for-coding <value>", "Kimi For Coding subscription: no, yes (default: no)")
   .option("--opencode-go <value>", "OpenCode Go subscription: no, yes (default: no)")
@@ -57,6 +58,7 @@ Model Providers (Priority: Native > Copilot > OpenCode Zen > Z.ai > Kimi):
       gemini: options.gemini,
       copilot: options.copilot,
       opencodeZen: options.opencodeZen,
+      minimaxCodingPlan: options.minimaxCodingPlan,
       zaiCodingPlan: options.zaiCodingPlan,
       kimiForCoding: options.kimiForCoding,
       opencodeGo: options.opencodeGo,

@@ -9,6 +9,7 @@ import { extractVersionFromPluginEntry } from "./version-compatibility"
 function detectProvidersFromOmoConfig(): {
   hasOpenAI: boolean
   hasOpencodeZen: boolean
+  hasMiniMaxCodingPlan: boolean
   hasZaiCodingPlan: boolean
   hasKimiForCoding: boolean
   hasOpencodeGo: boolean
@@ -18,6 +19,7 @@ function detectProvidersFromOmoConfig(): {
     return {
       hasOpenAI: true,
       hasOpencodeZen: true,
+      hasMiniMaxCodingPlan: false,
       hasZaiCodingPlan: false,
       hasKimiForCoding: false,
       hasOpencodeGo: false,
@@ -31,6 +33,7 @@ function detectProvidersFromOmoConfig(): {
       return {
         hasOpenAI: true,
         hasOpencodeZen: true,
+        hasMiniMaxCodingPlan: false,
         hasZaiCodingPlan: false,
         hasKimiForCoding: false,
         hasOpencodeGo: false,
@@ -38,17 +41,19 @@ function detectProvidersFromOmoConfig(): {
     }
 
     const configStr = JSON.stringify(omoConfig)
-    const hasOpenAI = configStr.includes('"openai/')
-    const hasOpencodeZen = configStr.includes('"opencode/')
-    const hasZaiCodingPlan = configStr.includes('"zai-coding-plan/')
-    const hasKimiForCoding = configStr.includes('"kimi-for-coding/')
-    const hasOpencodeGo = configStr.includes('"opencode-go/')
-
-    return { hasOpenAI, hasOpencodeZen, hasZaiCodingPlan, hasKimiForCoding, hasOpencodeGo }
+    return {
+      hasOpenAI: configStr.includes('"openai/'),
+      hasOpencodeZen: configStr.includes('"opencode/'),
+      hasMiniMaxCodingPlan: configStr.includes('"minimax/'),
+      hasZaiCodingPlan: configStr.includes('"zai-coding-plan/'),
+      hasKimiForCoding: configStr.includes('"kimi-for-coding/'),
+      hasOpencodeGo: configStr.includes('"opencode-go/'),
+    }
   } catch {
     return {
       hasOpenAI: true,
       hasOpencodeZen: true,
+      hasMiniMaxCodingPlan: false,
       hasZaiCodingPlan: false,
       hasKimiForCoding: false,
       hasOpencodeGo: false,
@@ -57,8 +62,8 @@ function detectProvidersFromOmoConfig(): {
 }
 
 function isOurPlugin(plugin: string): boolean {
-  return plugin === PLUGIN_NAME || plugin.startsWith(`${PLUGIN_NAME}@`) ||
-         plugin === LEGACY_PLUGIN_NAME || plugin.startsWith(`${LEGACY_PLUGIN_NAME}@`)
+  return plugin === PLUGIN_NAME || plugin.startsWith(`${PLUGIN_NAME}@`)
+    || plugin === LEGACY_PLUGIN_NAME || plugin.startsWith(`${LEGACY_PLUGIN_NAME}@`)
 }
 
 function findOurPluginEntry(plugins: string[]): string | null {
@@ -75,6 +80,7 @@ export function detectCurrentConfig(): DetectedConfig {
     hasGemini: false,
     hasCopilot: false,
     hasOpencodeZen: true,
+    hasMiniMaxCodingPlan: false,
     hasZaiCodingPlan: false,
     hasKimiForCoding: false,
     hasOpencodeGo: false,
@@ -106,9 +112,17 @@ export function detectCurrentConfig(): DetectedConfig {
   const providers = openCodeConfig.provider as Record<string, unknown> | undefined
   result.hasGemini = providers ? "google" in providers : false
 
-  const { hasOpenAI, hasOpencodeZen, hasZaiCodingPlan, hasKimiForCoding, hasOpencodeGo } = detectProvidersFromOmoConfig()
+  const {
+    hasOpenAI,
+    hasOpencodeZen,
+    hasMiniMaxCodingPlan,
+    hasZaiCodingPlan,
+    hasKimiForCoding,
+    hasOpencodeGo,
+  } = detectProvidersFromOmoConfig()
   result.hasOpenAI = hasOpenAI
   result.hasOpencodeZen = hasOpencodeZen
+  result.hasMiniMaxCodingPlan = hasMiniMaxCodingPlan
   result.hasZaiCodingPlan = hasZaiCodingPlan
   result.hasKimiForCoding = hasKimiForCoding
   result.hasOpencodeGo = hasOpencodeGo

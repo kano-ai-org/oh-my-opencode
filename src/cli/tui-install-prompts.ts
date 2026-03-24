@@ -80,6 +80,16 @@ export async function promptInstallConfig(detected: DetectedConfig): Promise<Ins
   })
   if (!opencodeZen) return null
 
+  const minimaxCodingPlan = await selectOrCancel({
+    message: "Do you have a MiniMax Coding Plan subscription?",
+    options: [
+      { value: "no", label: "No", hint: "Will use other configured providers" },
+      { value: "yes", label: "Yes", hint: "Use MiniMax M2.7 and allow HighSpeed when your account exposes it" },
+    ],
+    initialValue: initial.minimaxCodingPlan,
+  })
+  if (!minimaxCodingPlan) return null
+
   const zaiCodingPlan = await selectOrCancel({
     message: "Do you have a Z.ai Coding Plan subscription?",
     options: [
@@ -117,6 +127,7 @@ export async function promptInstallConfig(detected: DetectedConfig): Promise<Ins
     hasGemini: gemini === "yes",
     hasCopilot: copilot === "yes",
     hasOpencodeZen: opencodeZen === "yes",
+    hasMiniMaxCodingPlan: minimaxCodingPlan === "yes",
     hasZaiCodingPlan: zaiCodingPlan === "yes",
     hasKimiForCoding: kimiForCoding === "yes",
     hasOpencodeGo: opencodeGo === "yes",

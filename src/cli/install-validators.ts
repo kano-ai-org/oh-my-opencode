@@ -38,6 +38,7 @@ export function formatConfigSummary(config: InstallConfig): string {
   lines.push(formatProvider("Gemini", config.hasGemini))
   lines.push(formatProvider("GitHub Copilot", config.hasCopilot, "fallback"))
   lines.push(formatProvider("OpenCode Zen", config.hasOpencodeZen, "opencode/ models"))
+  lines.push(formatProvider("MiniMax Coding Plan", config.hasMiniMaxCodingPlan, "MiniMax M2.7 + M2.7 HighSpeed when available"))
   lines.push(formatProvider("Z.ai Coding Plan", config.hasZaiCodingPlan, "Librarian/Multimodal"))
   lines.push(formatProvider("Kimi For Coding", config.hasKimiForCoding, "Sisyphus/Prometheus fallback"))
 
@@ -48,7 +49,7 @@ export function formatConfigSummary(config: InstallConfig): string {
   lines.push(color.bold(color.white("Model Assignment")))
   lines.push("")
   lines.push(`  ${SYMBOLS.info} Models auto-configured based on provider priority`)
-  lines.push(`  ${SYMBOLS.bullet} Priority: Native > Copilot > OpenCode Zen > Z.ai`)
+  lines.push(`  ${SYMBOLS.bullet} Priority: Native > Copilot > OpenCode Zen > MiniMax > Z.ai`)
 
   return lines.join("\n")
 }
@@ -145,6 +146,10 @@ export function validateNonTuiArgs(args: InstallArgs): { valid: boolean; errors:
     errors.push(`Invalid --opencode-zen value: ${args.opencodeZen} (expected: no, yes)`)
   }
 
+  if (args.minimaxCodingPlan !== undefined && !["no", "yes"].includes(args.minimaxCodingPlan)) {
+    errors.push(`Invalid --minimax-coding-plan value: ${args.minimaxCodingPlan} (expected: no, yes)`)
+  }
+
   if (args.zaiCodingPlan !== undefined && !["no", "yes"].includes(args.zaiCodingPlan)) {
     errors.push(`Invalid --zai-coding-plan value: ${args.zaiCodingPlan} (expected: no, yes)`)
   }
@@ -164,6 +169,7 @@ export function argsToConfig(args: InstallArgs): InstallConfig {
     hasGemini: args.gemini === "yes",
     hasCopilot: args.copilot === "yes",
     hasOpencodeZen: args.opencodeZen === "yes",
+    hasMiniMaxCodingPlan: args.minimaxCodingPlan === "yes",
     hasZaiCodingPlan: args.zaiCodingPlan === "yes",
 hasKimiForCoding: args.kimiForCoding === "yes",
     hasOpencodeGo: args.opencodeGo === "yes",
@@ -176,6 +182,7 @@ export function detectedToInitialValues(detected: DetectedConfig): {
   gemini: BooleanArg
   copilot: BooleanArg
   opencodeZen: BooleanArg
+  minimaxCodingPlan: BooleanArg
   zaiCodingPlan: BooleanArg
 kimiForCoding: BooleanArg
   opencodeGo: BooleanArg
@@ -191,6 +198,7 @@ kimiForCoding: BooleanArg
     gemini: detected.hasGemini ? "yes" : "no",
     copilot: detected.hasCopilot ? "yes" : "no",
     opencodeZen: detected.hasOpencodeZen ? "yes" : "no",
+    minimaxCodingPlan: detected.hasMiniMaxCodingPlan ? "yes" : "no",
     zaiCodingPlan: detected.hasZaiCodingPlan ? "yes" : "no",
 kimiForCoding: detected.hasKimiForCoding ? "yes" : "no",
     opencodeGo: detected.hasOpencodeGo ? "yes" : "no",

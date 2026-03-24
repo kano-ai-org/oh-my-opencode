@@ -11,6 +11,7 @@ function createConfig(overrides: Partial<InstallConfig> = {}): InstallConfig {
     hasGemini: false,
     hasCopilot: false,
     hasOpencodeZen: false,
+    hasMiniMaxCodingPlan: false,
     hasZaiCodingPlan: false,
     hasKimiForCoding: false,
     hasOpencodeGo: false,
@@ -187,6 +188,14 @@ describe("generateModelConfig", () => {
 
       // #then should use ZAI_MODEL for librarian
       expect(result).toMatchSnapshot()
+    })
+
+    test("uses MiniMax M2.7 when only MiniMax Coding Plan is available", () => {
+      const config = createConfig({ hasMiniMaxCodingPlan: true })
+      const result = generateModelConfig(config)
+
+      expect(result.agents?.librarian?.model).toBe("minimax/minimax-m2.7")
+      expect(result.agents?.explore?.model).toBe("minimax/minimax-m2.7")
     })
 
     test("uses ZAI model for librarian with isMax20 flag", () => {
@@ -534,7 +543,7 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then librarian should use ZAI_MODEL
-      expect(result.agents?.librarian?.model).toBe("zai-coding-plan/glm-4.7")
+      expect(result.agents?.librarian?.model).toBe("zai-coding-plan/glm-5")
     })
 
     test("librarian is omitted when no librarian provider matches", () => {
