@@ -20,10 +20,11 @@ import { transformModelForProvider } from "./provider-model-id-transform"
 
 export type { GeneratedOmoConfig } from "./model-fallback-types"
 
-const ZAI_MODEL = "zai-coding-plan/glm-4.7"
+const MINIMAX_MODEL = "minimax/minimax-m2.7"
+const ZAI_MODEL = "zai-coding-plan/glm-5"
 
-const ULTIMATE_FALLBACK = "opencode/gpt-5-nano"
-const SCHEMA_URL = "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json"
+const ULTIMATE_FALLBACK = "opencode/big-pickle"
+const SCHEMA_URL = "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/dev/assets/oh-my-opencode.schema.json"
 
 function toFallbackModelObject(entry: FallbackEntry, provider: string): FallbackModelObject {
   return {
@@ -103,6 +104,7 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
     avail.native.gemini ||
     avail.opencodeZen ||
     avail.copilot ||
+    avail.minimaxCodingPlan ||
     avail.zai ||
     avail.kimiForCoding ||
     avail.opencodeGo ||
@@ -131,6 +133,14 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
         agentConfig = { model: "openai/gpt-5.4-mini-fast" }
       } else if (avail.opencodeGo) {
         agentConfig = { model: "opencode-go/minimax-m2.7" }
+      } else if (avail.minimaxCodingPlan) {
+        const resolved = resolveModelFromChain(
+          req.fallbackChain.filter((entry) => entry.providers.includes("minimax")),
+          avail,
+        )
+        agentConfig = resolved
+          ? { model: resolved.model, ...(resolved.variant ? { variant: resolved.variant } : {}) }
+          : { model: MINIMAX_MODEL }
       } else if (avail.zai) {
         agentConfig = { model: ZAI_MODEL }
       } else if (avail.vercelAiGateway) {
@@ -148,6 +158,14 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
         agentConfig = { model: "openai/gpt-5.4-mini-fast" }
       } else if (avail.native.claude) {
         agentConfig = { model: "anthropic/claude-haiku-4-5" }
+      } else if (avail.minimaxCodingPlan) {
+        const resolved = resolveModelFromChain(
+          req.fallbackChain.filter((entry) => entry.providers.includes("minimax")),
+          avail,
+        )
+        agentConfig = resolved
+          ? { model: resolved.model, ...(resolved.variant ? { variant: resolved.variant } : {}) }
+          : { model: MINIMAX_MODEL }
       } else if (avail.opencodeZen) {
         agentConfig = { model: "opencode/claude-haiku-4-5" }
       } else if (avail.opencodeGo) {

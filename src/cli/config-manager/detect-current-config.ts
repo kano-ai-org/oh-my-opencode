@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from "node:fs"
-import { parseJsonc, LEGACY_PLUGIN_NAME, PLUGIN_NAME } from "../../shared"
+import { parseJsonc } from "../../shared"
 import type { DetectedConfig } from "../types"
 import { getOmoConfigPath } from "./config-context"
 import { detectConfigFormat } from "./opencode-config-format"
@@ -82,7 +82,6 @@ function isOurPlugin(plugin: string): boolean {
 function findOurPluginEntry(plugins: string[]): string | null {
   return plugins.find(isOurPlugin) ?? null
 }
-
 export function detectCurrentConfig(): DetectedConfig {
   const result: DetectedConfig = {
     isInstalled: false,
