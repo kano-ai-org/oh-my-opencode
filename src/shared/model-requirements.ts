@@ -70,19 +70,21 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
   librarian: {
     fallbackChain: [
+      { providers: ["minimax"], model: "minimax-m2.7" },
       {
         providers: ["google", "github-copilot", "opencode"],
         model: "gemini-3-flash",
       },
-      { providers: ["opencode"], model: "minimax-m2.5-free" },
+      { providers: ["minimax"], model: "minimax-m2.7-highspeed" },
       { providers: ["opencode"], model: "big-pickle" },
     ],
   },
   explore: {
     fallbackChain: [
       { providers: ["github-copilot"], model: "grok-code-fast-1" },
-      { providers: ["opencode"], model: "minimax-m2.5-free" },
+      { providers: ["minimax"], model: "minimax-m2.7" },
       { providers: ["anthropic", "opencode"], model: "claude-haiku-4-5" },
+      { providers: ["minimax"], model: "minimax-m2.7-highspeed" },
       { providers: ["opencode"], model: "gpt-5-nano" },
     ],
   },
@@ -98,7 +100,9 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         providers: ["google", "github-copilot", "opencode"],
         model: "gemini-3-flash",
       },
+      { providers: ["minimax"], model: "minimax-m2.7" },
       { providers: ["zai-coding-plan"], model: "glm-4.6v" },
+      { providers: ["minimax"], model: "minimax-m2.7-highspeed" },
       {
         providers: ["openai", "opencode"],
         model: "gpt-5-nano",

@@ -56,19 +56,23 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(last.model).toBe("big-pickle")
   })
 
-  test("librarian has valid fallbackChain with gemini-3-flash as primary", () => {
+  test("librarian has valid fallbackChain with MiniMax M2.7 as primary", () => {
     // given - librarian agent requirement
     const librarian = AGENT_MODEL_REQUIREMENTS["librarian"]
 
     // when - accessing librarian requirement
-    // then - fallbackChain exists with gemini-3-flash as first entry
+    // then - fallbackChain exists with MiniMax M2.7 as first entry
     expect(librarian).toBeDefined()
     expect(librarian.fallbackChain).toBeArray()
     expect(librarian.fallbackChain.length).toBeGreaterThan(0)
 
     const primary = librarian.fallbackChain[0]
-    expect(primary.providers[0]).toBe("google")
-    expect(primary.model).toBe("gemini-3-flash")
+    expect(primary.providers[0]).toBe("minimax")
+    expect(primary.model).toBe("minimax-m2.7")
+
+    const secondary = librarian.fallbackChain[1]
+    expect(secondary.providers[0]).toBe("minimax")
+    expect(secondary.model).toBe("minimax-m2.7-highspeed")
   })
 
   test("explore has valid fallbackChain with grok-code-fast-1 as primary", () => {
@@ -76,26 +80,30 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     const explore = AGENT_MODEL_REQUIREMENTS["explore"]
 
     // when - accessing explore requirement
-    // then - fallbackChain: grok → minimax-free → haiku → nano
+    // then - fallbackChain: grok → minimax m2.7 → minimax m2.7 highspeed → haiku → nano
     expect(explore).toBeDefined()
     expect(explore.fallbackChain).toBeArray()
-    expect(explore.fallbackChain).toHaveLength(4)
+    expect(explore.fallbackChain).toHaveLength(5)
 
     const primary = explore.fallbackChain[0]
     expect(primary.providers).toContain("github-copilot")
     expect(primary.model).toBe("grok-code-fast-1")
 
     const secondary = explore.fallbackChain[1]
-    expect(secondary.providers).toContain("opencode")
-    expect(secondary.model).toBe("minimax-m2.5-free")
+    expect(secondary.providers).toContain("minimax")
+    expect(secondary.model).toBe("minimax-m2.7")
 
     const tertiary = explore.fallbackChain[2]
-    expect(tertiary.providers).toContain("anthropic")
-    expect(tertiary.model).toBe("claude-haiku-4-5")
+    expect(tertiary.providers).toContain("minimax")
+    expect(tertiary.model).toBe("minimax-m2.7-highspeed")
 
     const quaternary = explore.fallbackChain[3]
-    expect(quaternary.providers).toContain("opencode")
-    expect(quaternary.model).toBe("gpt-5-nano")
+    expect(quaternary.providers).toContain("anthropic")
+    expect(quaternary.model).toBe("claude-haiku-4-5")
+
+    const last = explore.fallbackChain[4]
+    expect(last.providers).toContain("opencode")
+    expect(last.model).toBe("gpt-5-nano")
   })
 
   test("multimodal-looker has valid fallbackChain with gpt-5.4 as primary", () => {
@@ -103,10 +111,10 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     const multimodalLooker = AGENT_MODEL_REQUIREMENTS["multimodal-looker"]
 
     // when - accessing multimodal-looker requirement
-    // then - fallbackChain: gpt-5.4 -> k2p5 -> gemini-3-flash -> glm-4.6v -> gpt-5-nano
+    // then - fallbackChain: gpt-5.4 -> k2p5 -> gemini-3-flash -> MiniMax M2.7 -> MiniMax M2.7 highspeed -> glm-4.6v -> gpt-5-nano
     expect(multimodalLooker).toBeDefined()
     expect(multimodalLooker.fallbackChain).toBeArray()
-    expect(multimodalLooker.fallbackChain).toHaveLength(5)
+    expect(multimodalLooker.fallbackChain).toHaveLength(7)
 
     const primary = multimodalLooker.fallbackChain[0]
     expect(primary.providers).toEqual(["openai", "opencode"])
@@ -118,7 +126,13 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
 
     const tertiary = multimodalLooker.fallbackChain[2]
     expect(tertiary.model).toBe("gemini-3-flash")
-    const last = multimodalLooker.fallbackChain[4]
+    const quaternary = multimodalLooker.fallbackChain[3]
+    expect(quaternary.providers).toEqual(["minimax"])
+    expect(quaternary.model).toBe("minimax-m2.7")
+    const quinary = multimodalLooker.fallbackChain[4]
+    expect(quinary.providers).toEqual(["minimax"])
+    expect(quinary.model).toBe("minimax-m2.7-highspeed")
+    const last = multimodalLooker.fallbackChain[6]
     expect(last.providers).toEqual(["openai", "opencode"])
     expect(last.model).toBe("gpt-5-nano")
   })

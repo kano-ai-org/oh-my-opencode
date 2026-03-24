@@ -6,6 +6,7 @@ export interface ProviderAvailability {
 	}
 	opencodeZen: boolean
 	copilot: boolean
+	minimaxCodingPlan: boolean
 	zai: boolean
 kimiForCoding: boolean
 	opencodeGo: boolean

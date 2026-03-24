@@ -5,7 +5,6 @@ import {
 import type { InstallConfig } from "./types"
 
 import type { AgentConfig, CategoryConfig, GeneratedOmoConfig } from "./model-fallback-types"
-import { applyOpenAiOnlyModelCatalog, isOpenAiOnlyAvailability } from "./openai-only-model-catalog"
 import { toProviderAvailability } from "./provider-availability"
 import {
 	getSisyphusFallbackChain,
@@ -17,10 +16,11 @@ import {
 
 export type { GeneratedOmoConfig } from "./model-fallback-types"
 
-const ZAI_MODEL = "zai-coding-plan/glm-4.7"
+const MINIMAX_MODEL = "minimax/minimax-m2.7"
+const ZAI_MODEL = "zai-coding-plan/glm-5"
 
-const ULTIMATE_FALLBACK = "opencode/gpt-5-nano"
-const SCHEMA_URL = "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json"
+const ULTIMATE_FALLBACK = "opencode/big-pickle"
+const SCHEMA_URL = "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/dev/assets/oh-my-opencode.schema.json"
 
 
 
@@ -32,9 +32,10 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
     avail.native.gemini ||
     avail.opencodeZen ||
     avail.copilot ||
+    avail.minimaxCodingPlan ||
     avail.zai ||
-    avail.kimiForCoding ||
-    avail.opencodeGo
+    avail.kimiForCoding
+
   if (!hasAnyProvider) {
     return {
       $schema: SCHEMA_URL,
@@ -53,22 +54,31 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
   const categories: Record<string, CategoryConfig> = {}
 
   for (const [role, req] of Object.entries(CLI_AGENT_MODEL_REQUIREMENTS)) {
-    if (role === "librarian") {
-      if (avail.opencodeGo) {
-        agents[role] = { model: "opencode-go/minimax-m2.7" }
-      } else if (avail.zai) {
-        agents[role] = { model: ZAI_MODEL }
-      }
+    if (role === "librarian" && avail.minimaxCodingPlan) {
+      const resolved = resolveModelFromChain(
+        req.fallbackChain.filter((entry) => entry.providers.includes("minimax")),
+        avail,
+      )
+      agents[role] = resolved ? { model: resolved.model, ...(resolved.variant ? { variant: resolved.variant } : {}) } : { model: MINIMAX_MODEL }
+      continue
+    }
+
+    if (role === "librarian" && avail.zai) {
+      agents[role] = { model: ZAI_MODEL }
       continue
     }
 
     if (role === "explore") {
       if (avail.native.claude) {
         agents[role] = { model: "anthropic/claude-haiku-4-5" }
+      } else if (avail.minimaxCodingPlan) {
+        const resolved = resolveModelFromChain(
+          req.fallbackChain.filter((entry) => entry.providers.includes("minimax")),
+          avail,
+        )
+        agents[role] = resolved ? { model: resolved.model, ...(resolved.variant ? { variant: resolved.variant } : {}) } : { model: MINIMAX_MODEL }
       } else if (avail.opencodeZen) {
         agents[role] = { model: "opencode/claude-haiku-4-5" }
-      } else if (avail.opencodeGo) {
-        agents[role] = { model: "opencode-go/minimax-m2.7" }
       } else if (avail.copilot) {
         agents[role] = { model: "github-copilot/gpt-5-mini" }
       } else {
@@ -129,15 +139,11 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
     }
   }
 
-  const generatedConfig: GeneratedOmoConfig = {
+  return {
     $schema: SCHEMA_URL,
     agents,
     categories,
   }
-
-  return isOpenAiOnlyAvailability(avail)
-    ? applyOpenAiOnlyModelCatalog(generatedConfig)
-    : generatedConfig
 }
 
 export function shouldShowChatGPTOnlyWarning(config: InstallConfig): boolean {

@@ -49,6 +49,8 @@ export const CLI_AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
   librarian: {
     fallbackChain: [
+      { providers: ["minimax"], model: "minimax-m2.7" },
+      { providers: ["minimax"], model: "minimax-m2.7-highspeed" },
       { providers: ["zai-coding-plan"], model: "glm-4.7" },
       { providers: ["opencode"], model: "glm-4.7-free" },
       {
@@ -60,6 +62,8 @@ export const CLI_AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   explore: {
     fallbackChain: [
       { providers: ["github-copilot"], model: "grok-code-fast-1" },
+      { providers: ["minimax"], model: "minimax-m2.7" },
+      { providers: ["minimax"], model: "minimax-m2.7-highspeed" },
       { providers: ["anthropic", "opencode"], model: "claude-haiku-4-5" },
       { providers: ["opencode"], model: "gpt-5-nano" },
     ],
@@ -76,6 +80,8 @@ export const CLI_AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         providers: ["google", "github-copilot", "opencode"],
         model: "gemini-3-flash",
       },
+      { providers: ["minimax"], model: "minimax-m2.7" },
+      { providers: ["minimax"], model: "minimax-m2.7-highspeed" },
       { providers: ["zai-coding-plan"], model: "glm-4.6v" },
       { providers: ["opencode"], model: "gpt-5-nano" },
     ],
