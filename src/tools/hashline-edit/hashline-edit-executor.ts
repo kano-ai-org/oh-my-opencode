@@ -24,6 +24,7 @@ type ToolContextWithCallID = ToolContext & {
 
 type ToolContextWithMetadata = ToolContextWithCallID & {
   metadata?: (value: unknown) => void
+  directory?: string
 }
 
 function resolveToolCallID(ctx: ToolContextWithCallID): string | undefined {
@@ -132,7 +133,10 @@ export async function executeHashlineEditTool(args: HashlineEditArgs, context: T
     await Bun.write(filePath, writeContent)
 
     if (pluginCtx?.client) {
-      await runFormattersForFile(pluginCtx.client as FormatterClient, context.directory, filePath)
+      const formatterDirectory = metadataContext.directory ?? pluginCtx.directory
+      if (formatterDirectory) {
+        await runFormattersForFile(pluginCtx.client as FormatterClient, formatterDirectory, filePath)
+      }
       const formattedContent = Buffer.from(await Bun.file(filePath).arrayBuffer()).toString("utf8")
       if (formattedContent !== writeContent) {
         const formattedEnvelope = canonicalizeFileText(formattedContent)
