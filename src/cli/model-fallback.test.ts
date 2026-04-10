@@ -445,7 +445,7 @@ describe("generateModelConfig", () => {
       expect(result.agents?.metis?.variant).toBe("high")
     })
 
-    test("Sisyphus-Junior resolves to OpenAI when only OpenAI is available", () => {
+    test("Sisyphus-Junior is omitted when only OpenAI is available", () => {
       // #given
       const config = createConfig({ hasOpenAI: true })
 
@@ -453,8 +453,7 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then
-      expect(result.agents?.["sisyphus-junior"]?.model).toBe("openai/gpt-5.4")
-      expect(result.agents?.["sisyphus-junior"]?.variant).toBe("medium")
+      expect(result.agents?.["sisyphus-junior"]).toBeUndefined()
     })
   })
 
@@ -467,11 +466,11 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then
-      expect(result.agents?.hephaestus?.model).toBe("openai/gpt-5.4")
+      expect(result.agents?.hephaestus?.model).toBe("openai/gpt-5.3-codex")
       expect(result.agents?.hephaestus?.variant).toBe("medium")
     })
 
-    test("Hephaestus falls back to Copilot GPT-5.4 when only Copilot is available", () => {
+    test("Hephaestus is omitted when only Copilot is available", () => {
       // #given
       const config = createConfig({ hasCopilot: true })
 
@@ -479,10 +478,7 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then
-      expect(result.agents?.hephaestus).toEqual({
-        model: "github-copilot/gpt-5.4",
-        variant: "medium",
-      })
+      expect(result.agents?.hephaestus).toBeUndefined()
     })
 
     test("Hephaestus is created when OpenCode Zen is available (opencode provider connected)", () => {
@@ -493,7 +489,7 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then
-      expect(result.agents?.hephaestus?.model).toBe("opencode/gpt-5.4")
+      expect(result.agents?.hephaestus?.model).toBe("opencode/gpt-5.3-codex")
       expect(result.agents?.hephaestus?.variant).toBe("medium")
     })
 
@@ -620,7 +616,7 @@ describe("generateModelConfig", () => {
 
       // #then should include correct schema URL
       expect(result.$schema).toBe(
-        "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json"
+        "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/dev/assets/oh-my-opencode.schema.json"
       )
     })
   })

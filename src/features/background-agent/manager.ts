@@ -901,7 +901,7 @@ export class BackgroundManager {
         })(),
         parts: [createInternalAgentTextPart(input.prompt)],
       },
-    }).catch((error) => {
+    }).catch(async (error) => {
       log("[background-agent] resume prompt error:", error)
       existingTask.status = "interrupt"
       const errorMessage = error instanceof Error ? error.message : String(error)
@@ -1738,6 +1738,8 @@ export class BackgroundManager {
     this.completedTaskSummaries.get(task.parentSessionID)!.push({
       id: task.id,
       description: task.description,
+      status: task.status,
+      ...(task.error ? { error: task.error } : {}),
     })
 
     // Update pending tracking and check if all tasks complete
@@ -1759,7 +1761,12 @@ export class BackgroundManager {
     }
 
     const completedTasks = allComplete
-      ? (this.completedTaskSummaries.get(task.parentSessionID) ?? [{ id: task.id, description: task.description }])
+      ? (this.completedTaskSummaries.get(task.parentSessionID) ?? [{
+          id: task.id,
+          description: task.description,
+          status: task.status,
+          ...(task.error ? { error: task.error } : {}),
+        }])
       : []
 
     if (allComplete) {
@@ -2077,6 +2084,7 @@ export class BackgroundManager {
   async shutdown(): Promise<void> {
     if (this.shutdownTriggered) return
     this.shutdownTriggered = true
+    this.unregisterProcessCleanup()
     log("[background-agent] Shutting down BackgroundManager")
     this.stopPolling()
     const trackedSessionIDs = new Set<string>()
@@ -2151,7 +2159,6 @@ export class BackgroundManager {
     this.processingKeys.clear()
     this.taskHistory.clearAll()
     this.completedTaskSummaries.clear()
-    this.unregisterProcessCleanup()
     log("[background-agent] Shutdown complete")
 
   }
