@@ -7,50 +7,54 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from "node:fs"
 import { dirname, join, basename } from "node:path"
 import type { BoulderState, PlanProgress, TaskSessionState } from "./types"
-import { BOULDER_DIR, BOULDER_FILE, PROMETHEUS_PLANS_DIR } from "./constants"
+import { PROMETHEUS_PLANS_DIR } from "./constants"
+import { getBoulderFilePaths } from "./path-resolution"
 
 const RESERVED_KEYS = new Set(["__proto__", "prototype", "constructor"])
 
 export function getBoulderFilePath(directory: string): string {
-  return join(directory, BOULDER_DIR, BOULDER_FILE)
+  return getBoulderFilePaths(directory).primary
 }
 
 export function readBoulderState(directory: string): BoulderState | null {
-  const filePath = getBoulderFilePath(directory)
+  const { primary, fallback } = getBoulderFilePaths(directory)
+  const candidatePaths = [primary, ...(fallback ? [fallback] : [])]
+  for (const filePath of candidatePaths) {
+    if (!existsSync(filePath)) {
+      continue
+    }
 
-  if (!existsSync(filePath)) {
-    return null
-  }
-
-  try {
-    const content = readFileSync(filePath, "utf-8")
-    const parsed = JSON.parse(content)
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    try {
+      const content = readFileSync(filePath, "utf-8")
+      const parsed = JSON.parse(content)
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        return null
+      }
+      if (!Array.isArray(parsed.session_ids)) {
+        parsed.session_ids = []
+      }
+      if (!parsed.session_origins || typeof parsed.session_origins !== "object" || Array.isArray(parsed.session_origins)) {
+        parsed.session_origins = {}
+      }
+      if (parsed.session_ids.length === 1) {
+        const soleSessionId = parsed.session_ids[0]
+        if (
+          typeof soleSessionId === "string"
+          && parsed.session_origins[soleSessionId] !== "appended"
+          && parsed.session_origins[soleSessionId] !== "direct"
+        ) {
+          parsed.session_origins[soleSessionId] = "direct"
+        }
+      }
+      if (!parsed.task_sessions || typeof parsed.task_sessions !== "object" || Array.isArray(parsed.task_sessions)) {
+        parsed.task_sessions = {}
+      }
+      return parsed as BoulderState
+    } catch {
       return null
     }
-    if (!Array.isArray(parsed.session_ids)) {
-      parsed.session_ids = []
-    }
-    if (!parsed.session_origins || typeof parsed.session_origins !== "object" || Array.isArray(parsed.session_origins)) {
-      parsed.session_origins = {}
-    }
-    if (parsed.session_ids.length === 1) {
-      const soleSessionId = parsed.session_ids[0]
-      if (
-        typeof soleSessionId === "string"
-        && parsed.session_origins[soleSessionId] !== "appended"
-        && parsed.session_origins[soleSessionId] !== "direct"
-      ) {
-        parsed.session_origins[soleSessionId] = "direct"
-      }
-    }
-    if (!parsed.task_sessions || typeof parsed.task_sessions !== "object" || Array.isArray(parsed.task_sessions)) {
-      parsed.task_sessions = {}
-    }
-    return parsed as BoulderState
-  } catch {
-    return null
   }
+  return null
 }
 
 export function writeBoulderState(directory: string, state: BoulderState): boolean {
@@ -108,12 +112,15 @@ export function appendSessionId(
 }
 
 export function clearBoulderState(directory: string): boolean {
-  const filePath = getBoulderFilePath(directory)
+  const { primary, fallback } = getBoulderFilePaths(directory)
+  const targetPaths = [primary, ...(fallback ? [fallback] : [])]
 
   try {
-    if (existsSync(filePath)) {
-      const { unlinkSync } = require("node:fs")
-      unlinkSync(filePath)
+    const { unlinkSync } = require("node:fs")
+    for (const filePath of targetPaths) {
+      if (existsSync(filePath)) {
+        unlinkSync(filePath)
+      }
     }
     return true
   } catch {

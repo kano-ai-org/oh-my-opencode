@@ -63,7 +63,7 @@ export function resolveModelPipeline(
           original: normalized,
           match,
         })
-        return { model: match, provenance: source, attempted }
+        return { model: match, provenance: source }
       }
       log("Explicit override model unavailable, falling through to fallback chain", {
         model: normalized,
@@ -76,7 +76,7 @@ export function resolveModelPipeline(
       log("Model resolved via explicit override (no cache, first run)", {
         model: normalized,
       })
-      return { model: normalized, provenance: source, attempted }
+        return { model: normalized, provenance: source }
     }
 
     const parts = normalized.split("/")
@@ -89,7 +89,7 @@ export function resolveModelPipeline(
           original: normalized,
           model: transformedModel,
         })
-        return { model: transformedModel, provenance: source, attempted }
+        return { model: transformedModel, provenance: source }
       }
     }
 
