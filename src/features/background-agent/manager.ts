@@ -163,6 +163,16 @@ function buildLocalSessionUrl(directory: string, sessionID: string): string {
   return `http://127.0.0.1:4096/${encodedDirectory}/session/${sessionID}`
 }
 
+function isRetryableNotificationDispatchError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error)
+  const lowered = message.toLowerCase()
+  return (
+    lowered.includes("unexpected eof")
+    || lowered.includes("json parse error")
+    || lowered.includes("socket connection was closed unexpectedly")
+  )
+}
+
 export interface SubagentSessionCreatedEvent {
   sessionID: string
   parentID: string
@@ -1995,7 +2005,7 @@ The task was re-queued on a fallback model after a retryable failure.
       allComplete = remainingCount === 0
     }
 
-    const completedTasks = allComplete
+        const completedTasks = allComplete
       ? (this.completedTaskSummaries.get(task.parentSessionID) ?? [{ id: task.id, description: task.description, status: task.status, error: task.error, attempts: cloneAttempts(task) }])
       : []
 
@@ -2077,28 +2087,25 @@ The task was re-queued on a fallback model after a retryable failure.
           resolvedModel: model,
         })
 
-        const isTaskFailure = task.status === "error" || task.status === "cancelled" || task.status === "interrupt"
-        const shouldReply = allComplete || isTaskFailure
-
         const variant = promptContext?.model?.variant
+        const promptPayload = {
+          path: { id: task.parentSessionID },
+          body: {
+            noReply: !allComplete,
+            ...(agent !== undefined ? { agent } : {}),
+            ...(model !== undefined ? { model } : {}),
+            ...(variant !== undefined ? { variant } : {}),
+            ...(resolvedTools ? { tools: resolvedTools } : {}),
+            parts: [createInternalAgentTextPart(notification)],
+          },
+        }
 
         try {
-          await this.client.session.promptAsync({
-            path: { id: task.parentSessionID },
-            body: {
-              noReply: !shouldReply,
-              ...(agent !== undefined ? { agent } : {}),
-              ...(model !== undefined ? { model } : {}),
-              ...(variant !== undefined ? { variant } : {}),
-              ...(resolvedTools ? { tools: resolvedTools } : {}),
-              parts: [createInternalAgentTextPart(notification)],
-            },
-          })
+          await this.client.session.promptAsync(promptPayload)
           log("[background-agent] Sent notification to parent session:", {
             taskId: task.id,
             allComplete,
-            isTaskFailure,
-            noReply: !shouldReply,
+            noReply: !allComplete,
           })
         } catch (error) {
           if (isAbortedSessionError(error)) {
@@ -2107,6 +2114,25 @@ The task was re-queued on a fallback model after a retryable failure.
               parentSessionID: task.parentSessionID,
             })
             this.queuePendingNotification(task.parentSessionID, notification)
+          } else if (isRetryableNotificationDispatchError(error)) {
+            log("[background-agent] Retrying parent notification with prompt after promptAsync transport failure:", {
+              taskId: task.id,
+              parentSessionID: task.parentSessionID,
+              error: String(error),
+            })
+            try {
+              await this.client.session.prompt(promptPayload)
+              log("[background-agent] Retried notification to parent session with prompt:", {
+                taskId: task.id,
+                allComplete,
+                noReply: !allComplete,
+              })
+            } catch (retryError) {
+              if (isAbortedSessionError(retryError) || isRetryableNotificationDispatchError(retryError)) {
+                this.queuePendingNotification(task.parentSessionID, notification)
+              }
+              log("[background-agent] Failed to retry parent notification:", retryError)
+            }
           } else {
             log("[background-agent] Failed to send notification:", error)
           }
@@ -2134,7 +2160,6 @@ The task was re-queued on a fallback model after a retryable failure.
     pruneStaleTasksAndNotifications({
       tasks: this.tasks,
       notifications: this.notifications,
-      taskTtlMs: this.config?.taskTtlMs,
       onTaskPruned: (taskId, task, errorMessage) => {
         const wasPending = task.status === "pending"
         log("[background-agent] Pruning stale task:", { taskId, status: task.status, age: Math.round(((wasPending ? task.queuedAt?.getTime() : task.startedAt?.getTime()) ? (Date.now() - (wasPending ? task.queuedAt!.getTime() : task.startedAt!.getTime())) : 0) / 1000) + "s" })
