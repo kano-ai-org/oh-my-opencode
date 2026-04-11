@@ -7,11 +7,16 @@ type ChatHeadersHook = PluginInstance extends { "chat.headers"?: infer T }
   ? T
   : (input: unknown, output: unknown) => Promise<void>
 
+type CommandExecuteBeforeHook = PluginInstance extends { "command.execute.before"?: infer T }
+  ? T
+  : (input: any, output: any) => Promise<void>
+
 export type PluginInterface = Omit<
   PluginInstance,
-  "experimental.session.compacting" | "chat.headers"
+  "experimental.session.compacting" | "chat.headers" | "command.execute.before"
 > & {
   "chat.headers"?: ChatHeadersHook
+  "command.execute.before"?: CommandExecuteBeforeHook
 }
 
 export type ToolsRecord = Record<string, ToolDefinition>
