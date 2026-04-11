@@ -46,16 +46,67 @@ export function resolveModelPipeline(
   const fallbackChain = policy?.fallbackChain
   const systemDefaultModel = policy?.systemDefaultModel
 
-  const normalizedUiModel = normalizeModel(intent?.uiSelectedModel)
-  if (normalizedUiModel) {
-    log("Model resolved via UI selection", { model: normalizedUiModel })
-    return { model: normalizedUiModel, provenance: "override" }
+  function resolveExplicitOverride(
+    candidate: string | undefined,
+    source: "override",
+  ): ModelResolutionResult | undefined {
+    const normalized = normalizeModel(candidate)
+    if (!normalized) return undefined
+    attempted.push(normalized)
+
+    if (availableModels.size > 0) {
+      const parts = normalized.split("/")
+      const providerHint = parts.length >= 2 ? [parts[0]] : undefined
+      const match = fuzzyMatchModel(normalized, availableModels, providerHint)
+      if (match) {
+        log("Model resolved via explicit override (availability confirmed)", {
+          original: normalized,
+          match,
+        })
+        return { model: match, provenance: source, attempted }
+      }
+      log("Explicit override model unavailable, falling through to fallback chain", {
+        model: normalized,
+      })
+      return undefined
+    }
+
+    const connectedProviders = constraints.connectedProviders ?? connectedProvidersCache.readConnectedProvidersCache()
+    if (connectedProviders === null) {
+      log("Model resolved via explicit override (no cache, first run)", {
+        model: normalized,
+      })
+      return { model: normalized, provenance: source, attempted }
+    }
+
+    const parts = normalized.split("/")
+    if (parts.length >= 2) {
+      const provider = parts[0]
+      if (connectedProviders.includes(provider)) {
+        const modelName = parts.slice(1).join("/")
+        const transformedModel = `${provider}/${transformModelForProvider(provider, modelName)}`
+        log("Model resolved via explicit override (connected provider)", {
+          original: normalized,
+          model: transformedModel,
+        })
+        return { model: transformedModel, provenance: source, attempted }
+      }
+    }
+
+    log("Explicit override provider unavailable, falling through to fallback chain", {
+      model: normalized,
+    })
+    return undefined
   }
 
-  const normalizedUserModel = normalizeModel(intent?.userModel)
-  if (normalizedUserModel) {
-    log("Model resolved via config override", { model: normalizedUserModel })
-    return { model: normalizedUserModel, provenance: "override" }
+  const uiOverride = resolveExplicitOverride(intent?.uiSelectedModel, "override")
+  if (uiOverride) {
+    return uiOverride
+  }
+
+  const userOverride = resolveExplicitOverride(intent?.userModel, "override")
+  if (userOverride) {
+    return userOverride
   }
 
   const normalizedCategoryDefault = normalizeModel(intent?.categoryDefaultModel)

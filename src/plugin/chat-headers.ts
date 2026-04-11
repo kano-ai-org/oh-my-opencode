@@ -4,6 +4,11 @@ import type { PluginContext } from "./types"
 type ChatHeadersInput = {
   sessionID: string
   provider: { id: string }
+  model?: {
+    api?: {
+      npm?: string
+    }
+  }
   message: {
     id?: string
     role?: string
@@ -26,6 +31,7 @@ function buildChatHeadersInput(raw: unknown): ChatHeadersInput | null {
 
   const sessionID = raw.sessionID
   const provider = raw.provider
+  const model = raw.model
   const message = raw.message
 
   if (typeof sessionID !== "string") return null
@@ -35,6 +41,15 @@ function buildChatHeadersInput(raw: unknown): ChatHeadersInput | null {
   return {
     sessionID,
     provider: { id: provider.id },
+    model: isRecord(model)
+      ? {
+          api: isRecord(model.api)
+            ? {
+                npm: typeof model.api.npm === "string" ? model.api.npm : undefined,
+              }
+            : undefined,
+        }
+      : undefined,
     message: {
       id: typeof message.id === "string" ? message.id : undefined,
       role: typeof message.role === "string" ? message.role : undefined,
@@ -52,6 +67,10 @@ function isChatHeadersOutput(raw: unknown): raw is ChatHeadersOutput {
 
 function isCopilotProvider(providerID: string): boolean {
   return providerID === "github-copilot" || providerID === "github-copilot-enterprise"
+}
+
+function isSdkManagedCopilot(input: ChatHeadersInput): boolean {
+  return input.model?.api?.npm === "@ai-sdk/github-copilot"
 }
 
 async function hasInternalMarker(
@@ -123,17 +142,8 @@ export function createChatHeadersHandler(args: { ctx: PluginContext }): (input: 
     if (!isChatHeadersOutput(output)) return
 
     if (!isCopilotProvider(normalizedInput.provider.id)) return
-
-    // Do not override x-initiator when @ai-sdk/github-copilot is active.
-    // OpenCode's copilot fetch wrapper already sets x-initiator based on
-    // the actual request body content. Overriding it here causes a mismatch
-    // that the Copilot API rejects with "invalid initiator".
-    const model = isRecord(input) && isRecord((input as Record<string, unknown>).model)
-      ? (input as Record<string, unknown>).model as Record<string, unknown>
-      : undefined
-    const api = model && isRecord(model.api) ? model.api as Record<string, unknown> : undefined
-    if (api?.npm === "@ai-sdk/github-copilot") return
-
+    if (isSdkManagedCopilot(normalizedInput)) return
+    if (output.headers["x-initiator"]) return
     if (!(await isOmoInternalMessage(normalizedInput, ctx.client))) return
 
     output.headers["x-initiator"] = "agent"
