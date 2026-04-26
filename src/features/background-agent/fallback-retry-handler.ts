@@ -91,7 +91,8 @@ export async function tryFallbackRetry(args: {
     idleDeferralTimers.delete(task.id)
   }
 
-  const previousSessionID = task.sessionID
+  // Preserve session ID for retry reuse - do NOT clear or abort the existing session.
+  // The task will be retried on the same session with the new fallback model.
 
   task.attemptCount = selectedAttemptCount
   const transformedModelId = transformModelForProvider(providerID, nextFallback.model)
@@ -101,7 +102,6 @@ export async function tryFallbackRetry(args: {
     variant: nextFallback.variant,
   }
   task.status = "pending"
-  task.sessionID = undefined
   task.startedAt = undefined
   task.queuedAt = new Date()
   task.error = undefined
@@ -121,10 +121,6 @@ export async function tryFallbackRetry(args: {
     fallbackChain: task.fallbackChain,
     category: task.category,
     isUnstableAgent: task.isUnstableAgent,
-  }
-
-  if (previousSessionID) {
-    await abortWithTimeout(client, previousSessionID).catch(() => {})
   }
 
   queue.push({ task, input: retryInput })

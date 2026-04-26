@@ -449,6 +449,100 @@ export class BackgroundManager {
 
     const concurrencyKey = this.getConcurrencyKeyFromInput(input)
 
+    // Reuse existing session if this is a retry (sessionID already set from previous attempt)
+    // This prevents creating a new sibling session on each fallback retry
+    if (task.sessionID) {
+      log("[background-agent] Reusing existing session for retry:", {
+        taskId: task.id,
+        sessionID: task.sessionID,
+        model: input.model,
+      })
+
+      task.status = "running"
+      task.startedAt = new Date()
+      task.progress = {
+        toolCalls: 0,
+        lastUpdate: new Date(),
+      }
+      task.concurrencyKey = concurrencyKey
+      task.concurrencyGroup = concurrencyKey
+      subagentSessions.add(task.sessionID)
+
+      this.taskHistory.record(input.parentSessionID, { id: task.id, sessionID: task.sessionID, agent: input.agent, description: input.description, status: "running", category: input.category, startedAt: task.startedAt })
+      this.startPolling()
+
+      const toastManager = getTaskToastManager()
+      if (toastManager) {
+        toastManager.updateTask(task.id, "running")
+      }
+
+      log("[background-agent] Re-launching prompt on reused session:", { taskId: task.id, sessionID: task.sessionID, agent: input.agent, model: input.model })
+
+      if (input.model) {
+        applySessionPromptParams(task.sessionID, input.model)
+      }
+
+      const launchModel = input.model
+        ? {
+            providerID: input.model.providerID,
+            modelID: input.model.modelID,
+          }
+        : undefined
+      const launchVariant = input.model?.variant
+
+      // Fire-and-forget prompt via promptAsync on the reused session
+      this.client.session.promptAsync({
+        path: { id: task.sessionID },
+        body: {
+          agent: input.agent,
+          ...(launchModel ? { model: launchModel } : {}),
+          ...(launchVariant ? { variant: launchVariant } : {}),
+          system: input.skillContent,
+          tools: (() => {
+            const tools = {
+              task: false,
+              call_omo_agent: true,
+              question: false,
+              ...getAgentToolRestrictions(input.agent),
+            }
+            setSessionTools(task.sessionID!, tools)
+            return tools
+          })(),
+          parts: [createInternalAgentTextPart(input.prompt)],
+        },
+      }).catch(async (error) => {
+        log("[background-agent] Retry prompt error:", error)
+        task.status = "interrupt"
+        const errorMessage = error instanceof Error ? error.message : String(error)
+        if (errorMessage.includes("agent.name") || errorMessage.includes("undefined") || isAgentNotFoundError(error)) {
+          task.error = `Agent "${input.agent}" not found. Make sure the agent is registered in your opencode.json or provided by a plugin.`
+        } else {
+          task.error = errorMessage
+        }
+        task.completedAt = new Date()
+        if (task.rootSessionID) {
+          this.unregisterRootDescendant(task.rootSessionID)
+        }
+        if (task.concurrencyKey) {
+          this.concurrencyManager.release(task.concurrencyKey)
+          task.concurrencyKey = undefined
+        }
+
+        removeTaskToastTracking(task.id)
+
+        if (task.sessionID) {
+          await this.abortSessionWithLogging(task.sessionID, "retry launch error cleanup")
+        }
+
+        this.markForNotification(task)
+        this.enqueueNotificationForParent(task.parentSessionID, () => this.notifyParentSession(task)).catch(err => {
+          log("[background-agent] Failed to notify on retry error:", err)
+        })
+      })
+
+      return
+    }
+
     const parentSession = await this.client.session.get({
       path: { id: input.parentSessionID },
       query: { directory: this.directory },
@@ -1255,7 +1349,30 @@ export class BackgroundManager {
       return
     }
 
+    // Capture attemptCount at event arrival time to detect stale events from older attempts.
+    // If a newer retry has already begun (attemptCount increased), ignore this older event.
+    const eventArrivalAttemptCount = task.attemptCount ?? 0
+
     if (await this.tryFallbackRetry(task, errorInfo, "session.error")) {
+      // Verify this retry was for the same attemptCount we captured — not a stale event
+      // that arrived just after a newer retry was already queued.
+      log("[background-agent] session.error retry initiated, verifying attemptCount:", {
+        taskId: task.id,
+        eventArrivalAttemptCount,
+        currentAttemptCount: task.attemptCount,
+        isStale: task.attemptCount !== eventArrivalAttemptCount,
+      })
+      return
+    }
+
+    // After this point, task.status may be modified — verify not stale first.
+    // If attemptCount has advanced since we arrived, a newer retry is in progress; ignore.
+    if (task.attemptCount !== eventArrivalAttemptCount) {
+      log("[background-agent] Stale session.error ignored — newer attempt already in progress:", {
+        taskId: task.id,
+        eventArrivalAttemptCount,
+        currentAttemptCount: task.attemptCount,
+      })
       return
     }
 

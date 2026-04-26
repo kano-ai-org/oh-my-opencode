@@ -141,7 +141,7 @@ describe("session-manager tools", () => {
       include_todos: true,
       include_transcript: true,
     }, mockContext)
-    
+
     expect(typeof result).toBe("string")
   })
 
@@ -168,7 +168,7 @@ describe("session-manager tools", () => {
       query: "test",
       session_id: "ses_test123",
     }, mockContext)
-    
+
     expect(typeof result).toBe("string")
   })
 
@@ -205,4 +205,5 @@ describe("session-manager tools", () => {
     
     expect(typeof result).toBe("string")
   })
+
 })

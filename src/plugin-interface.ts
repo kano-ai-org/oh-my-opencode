@@ -6,6 +6,7 @@ import { createChatHeadersHandler } from "./plugin/chat-headers"
 import { createChatMessageHandler } from "./plugin/chat-message"
 import { createCommandExecuteBeforeHandler } from "./plugin/command-execute-before"
 import { createMessagesTransformHandler } from "./plugin/messages-transform"
+import { createSessionCompactingHandler } from "./plugin/session-compacting"
 import { createSystemTransformHandler } from "./plugin/system-transform"
 import { createEventHandler } from "./plugin/event"
 import { createToolExecuteAfterHandler } from "./plugin/tool-execute-after"
@@ -55,6 +56,10 @@ export function createPluginInterface(args: {
     }),
 
     "experimental.chat.messages.transform": createMessagesTransformHandler({
+      hooks,
+    }),
+
+    "experimental.session.compacting": createSessionCompactingHandler({
       hooks,
     }),
 

@@ -15,6 +15,7 @@ import {
   formatSearchResults,
   searchInSession,
 } from "./session-formatter"
+import { normalizeSessionID } from "./session-id"
 import type { SessionListArgs, SessionReadArgs, SessionSearchArgs, SessionInfoArgs, SearchResult } from "./types"
 
 const SEARCH_TIMEOUT_MS = 60_000
@@ -109,11 +110,12 @@ export function createSessionManagerTools(
     },
     execute: async (args: SessionReadArgs, _context) => {
       try {
-        if (!(await resolvedDeps.sessionExists(args.session_id))) {
+        const id = normalizeSessionID(args.session_id)
+        if (!(await resolvedDeps.sessionExists(id))) {
           return `Session not found: ${args.session_id}`
         }
 
-        let messages = await resolvedDeps.readSessionMessages(args.session_id)
+        let messages = await resolvedDeps.readSessionMessages(id)
 
         if (messages.length === 0) {
           return `Session not found: ${args.session_id}`
@@ -123,7 +125,7 @@ export function createSessionManagerTools(
           messages = messages.slice(0, args.limit)
         }
 
-        const todos = args.include_todos ? await resolvedDeps.readSessionTodos(args.session_id) : undefined
+        const todos = args.include_todos ? await resolvedDeps.readSessionTodos(id) : undefined
 
         return resolvedDeps.formatSessionMessages(messages, args.include_todos, todos)
       } catch (e) {
@@ -143,10 +145,11 @@ export function createSessionManagerTools(
     execute: async (args: SessionSearchArgs, _context) => {
       try {
         const resultLimit = args.limit && args.limit > 0 ? args.limit : 20
+        const id = args.session_id ? normalizeSessionID(args.session_id) : undefined
 
         const searchOperation = async (): Promise<SearchResult[]> => {
-          if (args.session_id) {
-            return resolvedDeps.searchInSession(args.session_id, args.query, args.case_sensitive, resultLimit)
+          if (id) {
+            return resolvedDeps.searchInSession(id, args.query, args.case_sensitive, resultLimit)
           }
 
           const allSessions = await resolvedDeps.getAllSessions()
@@ -180,7 +183,7 @@ export function createSessionManagerTools(
     },
     execute: async (args: SessionInfoArgs, _context) => {
       try {
-        const info = await resolvedDeps.getSessionInfo(args.session_id)
+        const info = await resolvedDeps.getSessionInfo(normalizeSessionID(args.session_id))
 
         if (!info) {
           return `Session not found: ${args.session_id}`

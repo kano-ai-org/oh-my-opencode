@@ -5,6 +5,12 @@ import { MESSAGE_STORAGE, PART_STORAGE, SESSION_STORAGE, TODO_DIR, TRANSCRIPT_DI
 import { getMessageDir } from "../../shared/opencode-message-dir"
 import type { SessionInfo, SessionMessage, SessionMetadata, TodoItem } from "./types"
 
+function normalizeDirectory(directory: string): string {
+  const normalized = directory.replace(/\\/g, "/").replace(/\/+$/, "")
+  if (!/^[A-Za-z]:\//.test(normalized)) return normalized
+  return `${normalized.slice(0, 1).toUpperCase()}${normalized.slice(1).toLowerCase()}`
+}
+
 export async function getFileMainSessions(directory?: string): Promise<SessionMetadata[]> {
   if (!existsSync(SESSION_STORAGE)) return []
 
@@ -24,7 +30,7 @@ export async function getFileMainSessions(directory?: string): Promise<SessionMe
           const content = await readFile(join(projectPath, file), "utf-8")
           const meta = JSON.parse(content) as SessionMetadata
           if (meta.parentID) continue
-          if (directory && meta.directory !== directory) continue
+          if (directory && normalizeDirectory(meta.directory) !== normalizeDirectory(directory)) continue
           sessions.push(meta)
         } catch {
           continue
