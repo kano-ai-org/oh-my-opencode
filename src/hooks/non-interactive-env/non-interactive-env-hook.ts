@@ -1,7 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { HOOK_NAME, NON_INTERACTIVE_ENV, SHELL_COMMAND_PATTERNS } from "./constants"
-import { log, buildEnvPrefix } from "../../shared"
-import { detectShellType } from "../../shared/shell-env"
+import { log } from "../../shared"
 
 export * from "./constants"
 export * from "./detector"
@@ -18,6 +17,10 @@ function detectBannedCommand(command: string): string | undefined {
     }
   }
   return undefined
+}
+
+function isGitShellCommand(command: string): boolean {
+  return /(?:^|(?:&&|\|\||[;|&(])\s*)git(?:\s|$)/.test(command)
 }
 
 export function createNonInteractiveEnvHook(_ctx: PluginInput) {
@@ -41,7 +44,7 @@ export function createNonInteractiveEnvHook(_ctx: PluginInput) {
       }
 
       // Only prepend env vars for git commands (editor blocking, pager, etc.)
-      const isGitCommand = /\bgit\b/.test(command)
+      const isGitCommand = isGitShellCommand(command)
       if (!isGitCommand) {
         return
       }
@@ -53,20 +56,14 @@ export function createNonInteractiveEnvHook(_ctx: PluginInput) {
       // The env vars (GIT_EDITOR=:, EDITOR=:, etc.) must ALWAYS be injected
       // for git commands to prevent interactive prompts.
 
-      const shellType = detectShellType()
-      const envPrefix = buildEnvPrefix(NON_INTERACTIVE_ENV, shellType)
-      
-      // Check if the command already starts with the prefix to avoid stacking.
-      // This maintains the non-interactive behavior and makes the operation idempotent.
-      if (command.trim().startsWith(envPrefix.trim())) {
-        return
+      output.args.env = {
+        ...(output.args.env && typeof output.args.env === "object" ? output.args.env as Record<string, string> : {}),
+        ...NON_INTERACTIVE_ENV,
       }
-
-      output.args.command = `${envPrefix} ${command}`
 
       log(`[${HOOK_NAME}] Prepended non-interactive env vars to git command`, {
         sessionID: input.sessionID,
-        envPrefix,
+        envKeys: Object.keys(NON_INTERACTIVE_ENV),
       })
     },
   }

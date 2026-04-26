@@ -77,7 +77,18 @@ export async function executeBackground(
 
     await toolContext.metadata?.({
       title: args.description,
-      metadata: { sessionId: sessionId ?? "pending" },
+      metadata: {
+        sessionId: sessionId ?? "pending",
+        ...(model
+          ? {
+              model: {
+                providerID: model.providerID,
+                modelID: model.modelID,
+                ...(model.variant ? { variant: model.variant } : {}),
+              },
+            }
+          : {}),
+      },
     })
 
     return `Background agent task launched successfully.

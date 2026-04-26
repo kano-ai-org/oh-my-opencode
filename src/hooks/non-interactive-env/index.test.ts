@@ -47,15 +47,11 @@ describe("non-interactive-env hook", () => {
         output
       )
 
-      const cmd = output.args.command as string
-      expect(cmd).toStartWith("export ")
-      expect(cmd).toContain("GIT_EDITOR=:")
-      expect(cmd).toContain("EDITOR=:")
-      expect(cmd).toContain("PAGER=cat")
-      expect(cmd).toContain("; git commit -m 'test'")
+      expect(output.args.command).toBe("git commit -m 'test'")
+      expect(output.args.env).toMatchObject(NON_INTERACTIVE_ENV)
     })
 
-    test("#given chained git commands #when hook executes #then export applies to all", async () => {
+    test("#given chained git commands #when hook executes #then env is attached without changing command", async () => {
       const hook = createNonInteractiveEnvHook(mockCtx)
       const output: { args: Record<string, unknown>; message?: string } = {
         args: { command: "git add file && git rebase --continue" },
@@ -66,9 +62,8 @@ describe("non-interactive-env hook", () => {
         output
       )
 
-      const cmd = output.args.command as string
-      expect(cmd).toStartWith("export ")
-      expect(cmd).toContain("; git add file && git rebase --continue")
+      expect(output.args.command).toBe("git add file && git rebase --continue")
+      expect(output.args.env).toMatchObject(NON_INTERACTIVE_ENV)
     })
 
     test("#given non-git bash command #when hook executes #then command unchanged", async () => {
@@ -83,6 +78,21 @@ describe("non-interactive-env hook", () => {
       )
 
       expect(output.args.command).toBe("ls -la")
+    })
+
+    test("#given command containing git as plain text #when hook executes #then env is not injected", async () => {
+      const hook = createNonInteractiveEnvHook(mockCtx)
+      const output: { args: Record<string, unknown>; message?: string } = {
+        args: { command: "printf 'git status'" },
+      }
+
+      await hook["tool.execute.before"](
+        { tool: "bash", sessionID: "test", callID: "1" },
+        output
+      )
+
+      expect(output.args.command).toBe("printf 'git status'")
+      expect(output.args.env).toBeUndefined()
     })
 
     test("#given non-bash tool #when hook executes #then command unchanged", async () => {
@@ -113,10 +123,8 @@ describe("non-interactive-env hook", () => {
       expect(output.args.command).toBeUndefined()
     })
 
-    test("#given git command already has prefix #when hook executes again #then does not duplicate prefix", async () => {
+    test("#given git command with existing env #when hook executes again #then merges idempotently", async () => {
       const hook = createNonInteractiveEnvHook(mockCtx)
-      
-      // First call: transforms the command
       const output1: { args: Record<string, unknown>; message?: string } = {
         args: { command: "git commit -m 'test'" },
       }
@@ -124,26 +132,22 @@ describe("non-interactive-env hook", () => {
         { tool: "bash", sessionID: "test", callID: "1" },
         output1
       )
-      
-      const firstResult = output1.args.command as string
-      expect(firstResult).toStartWith("export ")
-      
-      // Second call: takes the already-prefixed command
+
       const output2: { args: Record<string, unknown>; message?: string } = {
-        args: { command: firstResult },
+        args: { command: "git commit -m 'test'", env: output1.args.env },
       }
       await hook["tool.execute.before"](
         { tool: "bash", sessionID: "test", callID: "2" },
         output2
       )
-      
-      // Should be exactly the same (no double prefix)
-      expect(output2.args.command).toBe(firstResult)
+
+      expect(output2.args.command).toBe("git commit -m 'test'")
+      expect(output2.args.env).toEqual(output1.args.env)
     })
   })
 
   describe("shell escaping", () => {
-    test("#given git command #when building prefix #then VISUAL properly escaped", async () => {
+    test("#given git command #when hook executes #then VISUAL is present in env", async () => {
       const hook = createNonInteractiveEnvHook(mockCtx)
       const output: { args: Record<string, unknown>; message?: string } = {
         args: { command: "git status" },
@@ -154,11 +158,10 @@ describe("non-interactive-env hook", () => {
         output
       )
 
-      const cmd = output.args.command as string
-      expect(cmd).toContain("VISUAL=''")
+      expect((output.args.env as Record<string, string>).VISUAL).toBe("")
     })
 
-    test("#given git command #when building prefix #then all NON_INTERACTIVE_ENV vars included", async () => {
+    test("#given git command #when hook executes #then all NON_INTERACTIVE_ENV vars included", async () => {
       const hook = createNonInteractiveEnvHook(mockCtx)
       const output: { args: Record<string, unknown>; message?: string } = {
         args: { command: "git log" },
@@ -169,9 +172,9 @@ describe("non-interactive-env hook", () => {
         output
       )
 
-      const cmd = output.args.command as string
+      const env = output.args.env as Record<string, string>
       for (const key of Object.keys(NON_INTERACTIVE_ENV)) {
-        expect(cmd).toContain(`${key}=`)
+        expect(env).toHaveProperty(key, NON_INTERACTIVE_ENV[key])
       }
     })
   })
@@ -208,8 +211,7 @@ describe("non-interactive-env hook", () => {
   })
 
   describe("platform-aware shell syntax", () => {
-
-    test("#given macOS platform #when git command executes #then uses unix export syntax", async () => {
+    test("#given macOS platform #when git command executes #then command stays unchanged and env is attached", async () => {
       delete process.env.PSModulePath
       process.env.SHELL = "/bin/zsh"
       Object.defineProperty(process, "platform", { value: "darwin" })
@@ -224,14 +226,11 @@ describe("non-interactive-env hook", () => {
         output
       )
 
-      const cmd = output.args.command as string
-      expect(cmd).toStartWith("export ")
-      expect(cmd).toContain(";")
-      expect(cmd).not.toContain("$env:")
-      expect(cmd).not.toContain("set ")
+      expect(output.args.command).toBe("git status")
+      expect(output.args.env).toMatchObject(NON_INTERACTIVE_ENV)
     })
 
-    test("#given Linux platform #when git command executes #then uses unix export syntax", async () => {
+    test("#given Linux platform #when git command executes #then command stays unchanged and env is attached", async () => {
       delete process.env.PSModulePath
       process.env.SHELL = "/bin/bash"
       Object.defineProperty(process, "platform", { value: "linux" })
@@ -246,12 +245,11 @@ describe("non-interactive-env hook", () => {
         output
       )
 
-      const cmd = output.args.command as string
-      expect(cmd).toStartWith("export ")
-      expect(cmd).toContain("; git commit")
+      expect(output.args.command).toBe("git commit -m 'test'")
+      expect(output.args.env).toMatchObject(NON_INTERACTIVE_ENV)
     })
 
-    test("#given Windows with PowerShell env #when bash tool git command executes #then uses powershell syntax", async () => {
+    test("#given Windows with PowerShell env #when bash tool git command executes #then env injection stays shell-agnostic", async () => {
       delete process.env.SHELL
       delete process.env.MSYSTEM
       process.env.PSModulePath = "C:\\Program Files\\PowerShell\\Modules"
@@ -267,15 +265,11 @@ describe("non-interactive-env hook", () => {
         output
       )
 
-      const cmd = output.args.command as string
-      expect(cmd).toStartWith("$env:")
-      expect(cmd).toContain("; git status")
-      expect(cmd).toContain("$env:GIT_EDITOR=':'")
-      expect(cmd).not.toContain("set ")
-      expect(cmd).not.toContain("export ")
+      expect(output.args.command).toBe("git status")
+      expect(output.args.env).toMatchObject(NON_INTERACTIVE_ENV)
     })
 
-    test("#given Windows without SHELL env #when bash tool git command executes #then uses cmd syntax", async () => {
+    test("#given Windows without SHELL env #when bash tool git command executes #then env injection stays shell-agnostic", async () => {
       delete process.env.PSModulePath
       delete process.env.SHELL
       delete process.env.MSYSTEM
@@ -291,15 +285,11 @@ describe("non-interactive-env hook", () => {
         output
       )
 
-      const cmd = output.args.command as string
-      expect(cmd).toStartWith("set ")
-      expect(cmd).toContain(" && git log")
-      expect(cmd).toContain('GIT_EDITOR=":"')
-      expect(cmd).not.toContain("$env:")
-      expect(cmd).not.toContain("export ")
+      expect(output.args.command).toBe("git log")
+      expect(output.args.env).toMatchObject(NON_INTERACTIVE_ENV)
     })
 
-    test("#given Windows Git Bash environment with SHELL #when git command executes #then uses unix syntax", async () => {
+    test("#given Windows Git Bash environment #when git command executes #then env injection stays shell-agnostic", async () => {
       delete process.env.PSModulePath
       process.env.SHELL = "/usr/bin/bash"
       Object.defineProperty(process, "platform", { value: "win32" })
@@ -314,13 +304,11 @@ describe("non-interactive-env hook", () => {
         output
       )
 
-      const cmd = output.args.command as string
-      expect(cmd).toStartWith("export ")
-      expect(cmd).toContain("; git status")
-      expect(cmd).not.toContain("$env:")
+      expect(output.args.command).toBe("git status")
+      expect(output.args.env).toMatchObject(NON_INTERACTIVE_ENV)
     })
 
-    test("#given Windows Git Bash via MSYSTEM without SHELL #when git command executes #then uses unix syntax", async () => {
+    test("#given Windows Git Bash via MSYSTEM without SHELL #when git command executes #then env injection stays shell-agnostic", async () => {
       delete process.env.SHELL
       process.env.MSYSTEM = "MINGW64"
       process.env.PSModulePath = "C:\\Program Files\\PowerShell\\Modules"
@@ -336,13 +324,11 @@ describe("non-interactive-env hook", () => {
         output
       )
 
-      const cmd = output.args.command as string
-      expect(cmd).toStartWith("export ")
-      expect(cmd).toContain("; git status")
-      expect(cmd).not.toContain("$env:")
+      expect(output.args.command).toBe("git status")
+      expect(output.args.env).toMatchObject(NON_INTERACTIVE_ENV)
     })
 
-    test("#given Windows platform #when chained git commands via bash tool #then uses cmd syntax", async () => {
+    test("#given Windows platform #when chained git commands via bash tool #then command stays unchanged and env is attached", async () => {
       delete process.env.PSModulePath
       delete process.env.SHELL
       delete process.env.MSYSTEM
@@ -358,16 +344,11 @@ describe("non-interactive-env hook", () => {
         output
       )
 
-      const cmd = output.args.command as string
-      expect(cmd).toStartWith("set ")
-      expect(cmd).toContain(" && git add file && git commit")
-      expect(cmd).toContain('GIT_EDITOR=":"')
-      expect(cmd).not.toContain("export ")
-      expect(cmd).not.toContain("$env:")
+      expect(output.args.command).toBe("git add file && git commit -m 'test'")
+      expect(output.args.env).toMatchObject(NON_INTERACTIVE_ENV)
     })
 
-    test("#given SHELL=/bin/bash on win32 #when git command executes #then uses unix syntax", async () => {
-      // Git Bash or WSL sets SHELL env var - should override platform detection
+    test("#given SHELL=/bin/bash on win32 #when git command executes #then env injection stays shell-agnostic", async () => {
       delete process.env.PSModulePath
       process.env.SHELL = "/bin/bash"
       Object.defineProperty(process, "platform", { value: "win32" })
@@ -382,14 +363,11 @@ describe("non-interactive-env hook", () => {
         output
       )
 
-      const cmd = output.args.command as string
-      expect(cmd).toStartWith("export ")
-      expect(cmd).toContain("; git status")
-      expect(cmd).not.toContain("$env:")
+      expect(output.args.command).toBe("git status")
+      expect(output.args.env).toMatchObject(NON_INTERACTIVE_ENV)
     })
 
-    test("#given PSModulePath set on non-Windows #when git command executes #then uses powershell syntax", async () => {
-      // PowerShell detection via PSModulePath should work regardless of platform
+    test("#given PSModulePath set on non-Windows #when git command executes #then env injection stays shell-agnostic", async () => {
       delete process.env.SHELL
       delete process.env.MSYSTEM
       process.env.PSModulePath = "C:\\Program Files\\PowerShell\\Modules"
@@ -405,13 +383,11 @@ describe("non-interactive-env hook", () => {
         output
       )
 
-      const cmd = output.args.command as string
-      expect(cmd).toStartWith("$env:")
-      expect(cmd).toContain("; git log")
-      expect(cmd).not.toContain("export ")
+      expect(output.args.command).toBe("git log")
+      expect(output.args.env).toMatchObject(NON_INTERACTIVE_ENV)
     })
 
-    test("#given no SHELL and no PSModulePath on win32 #when git command executes #then uses cmd syntax", async () => {
+    test("#given no SHELL and no PSModulePath on win32 #when git command executes #then env injection stays shell-agnostic", async () => {
       // Platform fallback: win32 without env hints should use cmd
       delete process.env.SHELL
       delete process.env.PSModulePath
@@ -428,16 +404,11 @@ describe("non-interactive-env hook", () => {
         output
       )
 
-      const cmd = output.args.command as string
-      expect(cmd).toStartWith("set ")
-      expect(cmd).toContain(" && git status")
-      expect(cmd).toContain('GIT_EDITOR=":"')
-      expect(cmd).not.toContain("export ")
-      expect(cmd).not.toContain("$env:")
+      expect(output.args.command).toBe("git status")
+      expect(output.args.env).toMatchObject(NON_INTERACTIVE_ENV)
     })
 
-    test("#given no SHELL and no PSModulePath on linux #when git command executes #then uses unix syntax", async () => {
-      // Platform fallback: non-win32 without env hints should use unix
+    test("#given no SHELL and no PSModulePath on linux #when git command executes #then env injection stays shell-agnostic", async () => {
       delete process.env.SHELL
       delete process.env.PSModulePath
       Object.defineProperty(process, "platform", { value: "linux" })
@@ -452,11 +423,8 @@ describe("non-interactive-env hook", () => {
         output
       )
 
-      const cmd = output.args.command as string
-      expect(cmd).toStartWith("export ")
-      expect(cmd).toContain("; git status")
-      expect(cmd).not.toContain("$env:")
-      expect(cmd).not.toContain("set ")
+      expect(output.args.command).toBe("git status")
+      expect(output.args.env).toMatchObject(NON_INTERACTIVE_ENV)
     })
   })
 })

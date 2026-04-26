@@ -1,5 +1,6 @@
 import { afterAll, afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
 import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs"
+import { Database } from "bun:sqlite"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { randomUUID } from "node:crypto"
@@ -31,6 +32,10 @@ mock.module("./constants", () => ({
 mock.module("../../shared/opencode-storage-detection", () => ({
   isSqliteBackend: () => sqliteBackend,
   resetSqliteBackendCache: () => {},
+}))
+
+mock.module("../../shared/data-path", () => ({
+  getDataDir: () => TEST_DIR,
 }))
 
 mock.module("../../shared/opencode-message-dir", () => ({
@@ -89,6 +94,51 @@ function createSessionTodo(sessionID: string, items: Array<Record<string, unknow
   writeFileSync(join(TEST_TODO_DIR, `${sessionID}.json`), JSON.stringify(items))
 }
 
+function createSqliteDb(): Database {
+  const dir = join(TEST_DIR, "opencode")
+  mkdirSync(dir, { recursive: true })
+  const db = new Database(join(dir, "opencode.db"))
+  db.exec(`
+    CREATE TABLE session (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      workspace_id TEXT,
+      parent_id TEXT,
+      slug TEXT,
+      directory TEXT NOT NULL,
+      title TEXT,
+      version TEXT,
+      share_url TEXT,
+      summary_additions INTEGER,
+      summary_deletions INTEGER,
+      summary_files INTEGER,
+      summary_diffs TEXT,
+      revert TEXT,
+      permission TEXT,
+      time_created INTEGER,
+      time_updated INTEGER,
+      time_compacting INTEGER,
+      time_archived INTEGER
+    );
+    CREATE TABLE message (
+      id TEXT PRIMARY KEY,
+      session_id TEXT NOT NULL,
+      time_created INTEGER,
+      time_updated INTEGER,
+      data TEXT NOT NULL
+    );
+    CREATE TABLE part (
+      id TEXT PRIMARY KEY,
+      message_id TEXT NOT NULL,
+      session_id TEXT NOT NULL,
+      time_created INTEGER,
+      time_updated INTEGER,
+      data TEXT NOT NULL
+    );
+  `)
+  return db
+}
+
 describe("session-manager storage fallback", () => {
   const mockClient = {
     session: {
@@ -136,6 +186,16 @@ describe("session-manager storage fallback", () => {
 
     expect(sessions).toHaveLength(1)
     expect(sessions[0].id).toBe("ses_file")
+  })
+
+  test("#given file-backed windows path variant #when getMainSessions runs #then normalizes directory separators and case", async () => {
+    createSessionMetadata("proj_test", "ses_file", "D:/Workspace/Project", 2_000)
+    mockClient.session.list.mockImplementation(() => Promise.resolve({ data: [] }))
+
+    const sessions = await storage.getMainSessions({ directory: "d:\\workspace\\project\\" })
+
+    expect(sessions).toHaveLength(1)
+    expect(sessions[0]?.id).toBe("ses_file")
   })
 
   test("#given SDK and file sessions overlap #when getMainSessions runs #then dedupes by id and keeps SDK metadata", async () => {
@@ -238,6 +298,97 @@ describe("session-manager storage fallback", () => {
     const exists = await storage.sessionExists("ses_file")
 
     expect(exists).toBe(true)
+  })
+
+  test("#given empty SDK session list and sqlite session #when sessionExists runs #then falls back to sqlite existence", async () => {
+    const db = createSqliteDb()
+    db.query(`INSERT INTO session (id, project_id, parent_id, directory, title, time_created, time_updated, time_archived) VALUES (?, ?, NULL, ?, ?, ?, ?, NULL)`).run("ses_sqlite", "proj_sqlite", "/workspace/project", "SQLite", 1000, 2000)
+    db.close()
+    mockClient.session.list.mockImplementation(() => Promise.resolve({ data: [] }))
+
+    const exists = await storage.sessionExists("ses_sqlite")
+
+    expect(exists).toBe(true)
+  })
+
+  test("#given empty SDK list and sqlite session #when getMainSessions runs #then returns sqlite sessions", async () => {
+    const db = createSqliteDb()
+    db.query(`INSERT INTO session (id, project_id, parent_id, directory, title, time_created, time_updated, time_archived) VALUES (?, ?, NULL, ?, ?, ?, ?, NULL)`).run("ses_sqlite", "proj_sqlite", "/workspace/project", "SQLite", 1000, 2000)
+    db.close()
+    mockClient.session.list.mockImplementation(() => Promise.resolve({ data: [] }))
+
+    const sessions = await storage.getMainSessions({ directory: "/workspace/project" })
+
+    expect(sessions).toHaveLength(1)
+    expect(sessions[0]?.id).toBe("ses_sqlite")
+  })
+
+  test("#given sdk and sqlite sessions #when getMainSessions runs #then returns merged sessions", async () => {
+    const db = createSqliteDb()
+    db.query(`INSERT INTO session (id, project_id, parent_id, directory, title, time_created, time_updated, time_archived) VALUES (?, ?, NULL, ?, ?, ?, ?, NULL)`).run("ses_sqlite", "proj_sqlite", "/workspace/project", "SQLite", 1000, 2000)
+    db.close()
+    mockClient.session.list.mockImplementation(() => Promise.resolve({
+      data: [
+        {
+          id: "ses_sdk",
+          projectID: "proj_sdk",
+          directory: "/workspace/project",
+          time: { created: 3000, updated: 4000 },
+        },
+      ],
+    }))
+
+    const sessions = await storage.getMainSessions({ directory: "/workspace/project" })
+
+    expect(sessions).toHaveLength(2)
+    expect(sessions.map((session) => session.id)).toEqual(["ses_sdk", "ses_sqlite"])
+  })
+
+  test("#given empty SDK messages and sqlite rows #when readSessionMessages runs #then returns sqlite messages", async () => {
+    const db = createSqliteDb()
+    db.query(`INSERT INTO session (id, project_id, parent_id, directory, title, time_created, time_updated, time_archived) VALUES (?, ?, NULL, ?, ?, ?, ?, NULL)`).run("ses_sqlite", "proj_sqlite", "/workspace/project", "SQLite", 1000, 2000)
+    db.query(`INSERT INTO message (id, session_id, time_created, time_updated, data) VALUES (?, ?, ?, ?, ?)`).run("msg_sqlite", "ses_sqlite", 3000, 3000, JSON.stringify({ role: "user", agent: "build" }))
+    db.query(`INSERT INTO part (id, message_id, session_id, time_created, time_updated, data) VALUES (?, ?, ?, ?, ?, ?)`).run("prt_sqlite", "msg_sqlite", "ses_sqlite", 3001, 3001, JSON.stringify({ type: "text", text: "hello sqlite" }))
+    db.close()
+    mockClient.session.messages.mockImplementation(() => Promise.resolve({ data: [] }))
+
+    const messages = await storage.readSessionMessages("ses_sqlite")
+
+    expect(messages).toHaveLength(1)
+    expect(messages[0]?.parts[0]?.text).toBe("hello sqlite")
+  })
+
+  test("#given malformed sqlite rows alongside valid rows #when readSessionMessages runs #then skips malformed rows", async () => {
+    const db = createSqliteDb()
+    db.query(`INSERT INTO session (id, project_id, parent_id, directory, title, time_created, time_updated, time_archived) VALUES (?, ?, NULL, ?, ?, ?, ?, NULL)`).run("ses_sqlite", "proj_sqlite", "/workspace/project", "SQLite", 1000, 2000)
+    db.query(`INSERT INTO message (id, session_id, time_created, time_updated, data) VALUES (?, ?, ?, ?, ?)`).run("msg_bad", "ses_sqlite", 2000, 2000, "not-json")
+    db.query(`INSERT INTO message (id, session_id, time_created, time_updated, data) VALUES (?, ?, ?, ?, ?)`).run("msg_good", "ses_sqlite", 3000, 3000, JSON.stringify({ role: "assistant", agent: "build" }))
+    db.query(`INSERT INTO part (id, message_id, session_id, time_created, time_updated, data) VALUES (?, ?, ?, ?, ?, ?)`).run("prt_bad", "msg_good", "ses_sqlite", 3001, 3001, "not-json")
+    db.query(`INSERT INTO part (id, message_id, session_id, time_created, time_updated, data) VALUES (?, ?, ?, ?, ?, ?)`).run("prt_good", "msg_good", "ses_sqlite", 3002, 3002, JSON.stringify({ type: "text", text: "survives" }))
+    db.close()
+    mockClient.session.messages.mockImplementation(() => Promise.resolve({ data: [] }))
+
+    const messages = await storage.readSessionMessages("ses_sqlite")
+
+    expect(messages).toHaveLength(1)
+    expect(messages[0]?.id).toBe("msg_good")
+    expect(messages[0]?.parts[0]?.text).toBe("survives")
+  })
+
+  test("#given sqlite session info and file todos #when getSessionInfo runs #then returns merged metadata", async () => {
+    const db = createSqliteDb()
+    db.query(`INSERT INTO session (id, project_id, parent_id, directory, title, time_created, time_updated, time_archived) VALUES (?, ?, NULL, ?, ?, ?, ?, NULL)`).run("ses_sqlite", "proj_sqlite", "/workspace/project", "SQLite", 1000, 2000)
+    db.query(`INSERT INTO message (id, session_id, time_created, time_updated, data) VALUES (?, ?, ?, ?, ?)`).run("msg_sqlite", "ses_sqlite", 3000, 3000, JSON.stringify({ role: "user", agent: "build" }))
+    db.close()
+    createSessionTodo("ses_sqlite", [{ id: "todo_1", content: "carry me", status: "pending" }])
+    mockClient.session.messages.mockImplementation(() => Promise.resolve({ data: [] }))
+    mockClient.session.todo.mockImplementation(() => Promise.resolve({ data: [] }))
+
+    const info = await storage.getSessionInfo("ses_sqlite")
+
+    expect(info?.id).toBe("ses_sqlite")
+    expect(info?.has_todos).toBe(true)
+    expect(info?.todos?.[0]?.content).toBe("carry me")
   })
 
   test("#given semantic SDK error #when readSessionMessages runs #then rethrows instead of hiding bug", async () => {

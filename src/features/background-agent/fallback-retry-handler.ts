@@ -141,7 +141,6 @@ export async function tryFallbackRetry(args: {
   if (!nextAttempt) {
     return false
   }
-
   task.queuedAt = new Date()
   task.retryNotification = {
     previousSessionID,

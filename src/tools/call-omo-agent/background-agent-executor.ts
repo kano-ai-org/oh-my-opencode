@@ -70,7 +70,9 @@ export async function executeBackgroundAgent(
 
 		await toolContext.metadata?.({
 			title: args.description,
-			metadata: { sessionId: sessionId ?? "pending" },
+			metadata: {
+				sessionId: sessionId ?? "pending",
+			},
 		})
 
 		return `Background agent task launched successfully.

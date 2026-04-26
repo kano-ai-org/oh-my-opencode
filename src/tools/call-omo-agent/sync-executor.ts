@@ -93,7 +93,18 @@ export async function executeSync(
     await Promise.resolve(
       toolContext.metadata?.({
         title: args.description,
-        metadata: { sessionId: sessionID },
+        metadata: {
+          sessionId: sessionID,
+          ...(model
+            ? {
+                model: {
+                  providerID: model.providerID,
+                  modelID: model.modelID,
+                  ...(model.variant ? { variant: model.variant } : {}),
+                },
+              }
+            : {}),
+        },
       })
     )
 
