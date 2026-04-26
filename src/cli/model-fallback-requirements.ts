@@ -9,7 +9,7 @@ export const CLI_AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
     fallbackChain: [
       {
         providers: ["anthropic", "github-copilot", "opencode"],
-        model: "claude-opus-4-6",
+        model: "claude-opus-4-7",
         variant: "max",
       },
       { providers: ["kimi-for-coding"], model: "k2p5" },
@@ -21,12 +21,12 @@ export const CLI_AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   hephaestus: {
     fallbackChain: [
       {
-        providers: ["openai", "opencode"],
-        model: "gpt-5.3-codex",
+        providers: ["openai", "github-copilot", "opencode", "vercel"],
+        model: "gpt-5.4",
         variant: "medium",
       },
     ],
-    requiresProvider: ["openai", "opencode"],
+    requiresProvider: ["openai", "github-copilot", "opencode", "vercel"],
   },
   oracle: {
     fallbackChain: [
@@ -42,16 +42,19 @@ export const CLI_AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       },
       {
         providers: ["anthropic", "github-copilot", "opencode"],
-        model: "claude-opus-4-6",
+        model: "claude-opus-4-7",
         variant: "max",
       },
     ],
   },
   librarian: {
     fallbackChain: [
+      { providers: ["openai"], model: "gpt-5.4-mini-fast" },
+      { providers: ["opencode-go", "vercel"], model: "minimax-m2.7-highspeed" },
+      { providers: ["opencode-go", "vercel"], model: "minimax-m2.7" },
       { providers: ["minimax"], model: "minimax-m2.7" },
       { providers: ["minimax"], model: "minimax-m2.7-highspeed" },
-      { providers: ["zai-coding-plan"], model: "glm-4.7" },
+      { providers: ["zai-coding-plan"], model: "glm-5" },
       { providers: ["opencode"], model: "glm-4.7-free" },
       {
         providers: ["anthropic", "github-copilot", "opencode"],
@@ -61,7 +64,9 @@ export const CLI_AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
   explore: {
     fallbackChain: [
-      { providers: ["github-copilot"], model: "grok-code-fast-1" },
+      { providers: ["openai"], model: "gpt-5.4-mini-fast" },
+      { providers: ["opencode-go", "vercel"], model: "minimax-m2.7-highspeed" },
+      { providers: ["opencode-go", "vercel"], model: "minimax-m2.7" },
       { providers: ["minimax"], model: "minimax-m2.7" },
       { providers: ["minimax"], model: "minimax-m2.7-highspeed" },
       { providers: ["anthropic", "opencode"], model: "claude-haiku-4-5" },
@@ -71,26 +76,26 @@ export const CLI_AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   "multimodal-looker": {
     fallbackChain: [
       {
-        providers: ["openai", "opencode"],
+        providers: ["openai", "opencode", "vercel"],
         model: "gpt-5.4",
         variant: "medium",
       },
-      { providers: ["kimi-for-coding"], model: "k2p5" },
+      { providers: ["opencode-go", "vercel"], model: "kimi-k2.5" },
       {
-        providers: ["google", "github-copilot", "opencode"],
+        providers: ["google", "github-copilot", "opencode", "vercel"],
         model: "gemini-3-flash",
       },
       { providers: ["minimax"], model: "minimax-m2.7" },
       { providers: ["minimax"], model: "minimax-m2.7-highspeed" },
-      { providers: ["zai-coding-plan"], model: "glm-4.6v" },
-      { providers: ["opencode"], model: "gpt-5-nano" },
+      { providers: ["zai-coding-plan", "vercel"], model: "glm-4.6v" },
+      { providers: ["openai", "opencode", "vercel"], model: "gpt-5-nano" },
     ],
   },
   prometheus: {
     fallbackChain: [
       {
         providers: ["anthropic", "github-copilot", "opencode"],
-        model: "claude-opus-4-6",
+        model: "claude-opus-4-7",
         variant: "max",
       },
       { providers: ["kimi-for-coding"], model: "k2p5" },
@@ -109,7 +114,7 @@ export const CLI_AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
     fallbackChain: [
       {
         providers: ["anthropic", "github-copilot", "opencode"],
-        model: "claude-opus-4-6",
+        model: "claude-opus-4-7",
         variant: "max",
       },
       { providers: ["kimi-for-coding"], model: "k2p5" },
@@ -134,7 +139,7 @@ export const CLI_AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       },
       {
         providers: ["anthropic", "github-copilot", "opencode"],
-        model: "claude-opus-4-6",
+        model: "claude-opus-4-7",
         variant: "max",
       },
       {
@@ -158,6 +163,18 @@ export const CLI_AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       },
     ],
   },
+  "sisyphus-junior": {
+    fallbackChain: [
+      {
+        providers: ["anthropic", "github-copilot", "opencode"],
+        model: "claude-sonnet-4-5",
+      },
+      { providers: ["kimi-for-coding"], model: "k2p5" },
+      { providers: ["openai", "opencode"], model: "gpt-5.4", variant: "medium" },
+      { providers: ["minimax"], model: "minimax-m2.7" },
+      { providers: ["opencode"], model: "big-pickle" },
+    ],
+  },
 };
 
 export const CLI_CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> =
@@ -172,7 +189,7 @@ export const CLI_CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> =
         { providers: ["zai-coding-plan", "opencode"], model: "glm-5" },
         {
           providers: ["anthropic", "github-copilot", "opencode"],
-          model: "claude-opus-4-6",
+          model: "claude-opus-4-7",
           variant: "max",
         },
         { providers: ["kimi-for-coding"], model: "k2p5" },
@@ -192,7 +209,7 @@ export const CLI_CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> =
         },
         {
           providers: ["anthropic", "github-copilot", "opencode"],
-          model: "claude-opus-4-6",
+          model: "claude-opus-4-7",
           variant: "max",
         },
       ],
@@ -206,7 +223,7 @@ export const CLI_CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> =
         },
         {
           providers: ["anthropic", "github-copilot", "opencode"],
-          model: "claude-opus-4-6",
+          model: "claude-opus-4-7",
           variant: "max",
         },
         {
@@ -226,7 +243,7 @@ export const CLI_CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> =
         },
         {
           providers: ["anthropic", "github-copilot", "opencode"],
-          model: "claude-opus-4-6",
+          model: "claude-opus-4-7",
           variant: "max",
         },
         {
@@ -275,7 +292,7 @@ export const CLI_CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> =
         },
         {
           providers: ["anthropic", "github-copilot", "opencode"],
-          model: "claude-opus-4-6",
+          model: "claude-opus-4-7",
           variant: "max",
         },
         { providers: ["zai-coding-plan", "opencode"], model: "glm-5" },

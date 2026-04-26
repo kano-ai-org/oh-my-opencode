@@ -167,8 +167,11 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(quaternary.providers).toEqual(["minimax"])
     expect(quaternary.model).toBe("minimax-m2.7")
     const quinary = multimodalLooker.fallbackChain[4]
-    expect(quinary.providers).toEqual(["minimax"])
-    expect(quinary.model).toBe("minimax-m2.7-highspeed")
+    expect(quinary.providers).toEqual(["zai-coding-plan", "vercel"])
+    expect(quinary.model).toBe("glm-4.6v")
+    const senary = multimodalLooker.fallbackChain[5]
+    expect(senary.providers).toEqual(["minimax"])
+    expect(senary.model).toBe("minimax-m2.7-highspeed")
     const last = multimodalLooker.fallbackChain[6]
     expect(last.providers).toEqual(["openai", "github-copilot", "opencode", "vercel"])
     expect(last.model).toBe("gpt-5-nano")
