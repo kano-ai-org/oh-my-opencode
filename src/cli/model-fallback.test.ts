@@ -608,7 +608,7 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then librarian should not have fallback_models
-      expect(result.agents?.librarian?.model).toBe("zai-coding-plan/glm-4.7")
+      expect(result.agents?.librarian?.model).toBe("zai-coding-plan/glm-5")
       expect(result.agents?.librarian?.fallback_models).toBeUndefined()
     })
   })
@@ -691,7 +691,7 @@ describe("generateModelConfig", () => {
 
       // #then should include correct schema URL
       expect(result.$schema).toBe(
-        "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json"
+        "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/dev/assets/oh-my-opencode.schema.json"
       )
     })
   })

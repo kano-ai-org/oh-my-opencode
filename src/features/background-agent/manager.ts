@@ -1238,6 +1238,15 @@ export class BackgroundManager {
       const errorMessage = props ? getSessionErrorMessage(props) : undefined
 
       const errorInfo = { name: errorName, message: errorMessage }
+      if (
+        !isAgentNotFoundError({ message: errorInfo.message } as Error) &&
+        (!shouldRetryError(errorInfo) ||
+          !task.fallbackChain ||
+          !hasMoreFallbacks(task.fallbackChain, task.attemptCount ?? 0))
+      ) {
+        this.markSessionErrorTask(task, errorMessage ?? "Session error", errorName, errorInfo)
+        return
+      }
       void this.handleSessionErrorEvent({
         errorInfo,
         errorMessage,
@@ -1376,7 +1385,15 @@ export class BackgroundManager {
       return
     }
 
-    const errorMsg = errorMessage ?? "Session error"
+    this.markSessionErrorTask(task, errorMessage ?? "Session error", errorName, errorInfo)
+  }
+
+  private markSessionErrorTask(
+    task: BackgroundTask,
+    errorMsg: string,
+    errorName: string | undefined,
+    errorInfo: { name?: string; message?: string },
+  ): void {
     const canRetry =
       shouldRetryError(errorInfo) &&
       !!task.fallbackChain &&
