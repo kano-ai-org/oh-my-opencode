@@ -2,6 +2,14 @@ import { sortByScopePriority } from "./scope-priority"
 import type { CommandInfo } from "../slashcommand/types"
 import type { LoadedSkill } from "../../features/opencode-skill-loader"
 
+const KANO_META_SKILL_NAME = "kano-skills-meta"
+
+function isKanoNestedSkillRequest(requestedName: string): boolean {
+  const parts = requestedName.split("/")
+  const shortName = parts[parts.length - 1]
+  return shortName !== undefined && shortName.startsWith("kano-") && shortName.endsWith("-skill")
+}
+
 export function matchSkillByName(skills: LoadedSkill[], requestedName: string): LoadedSkill | undefined {
   const normalizedName = requestedName.toLowerCase()
   const exactMatch = skills.find((skill) => skill.name.toLowerCase() === normalizedName)
@@ -17,6 +25,10 @@ export function matchSkillByName(skills: LoadedSkill[], requestedName: string): 
 
   if (shortNameMatches.length === 1) {
     return shortNameMatches[0]
+  }
+
+  if (isKanoNestedSkillRequest(normalizedName)) {
+    return skills.find((skill) => skill.name.toLowerCase() === KANO_META_SKILL_NAME)
   }
 
   return undefined
