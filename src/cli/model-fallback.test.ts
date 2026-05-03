@@ -410,7 +410,7 @@ describe("generateModelConfig", () => {
       expect(result.agents?.sisyphus?.model).toBe("anthropic/claude-opus-4-7")
     })
 
-    test("Sisyphus resolves to gpt-5.5 medium when only OpenAI is available", () => {
+    test("Sisyphus resolves to gpt-5.4 medium when only OpenAI is available", () => {
       // #given
       const config = createConfig({ hasOpenAI: true })
 
@@ -418,7 +418,7 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then
-      expect(result.agents?.sisyphus?.model).toBe("openai/gpt-5.5")
+      expect(result.agents?.sisyphus?.model).toBe("openai/gpt-5.4")
       expect(result.agents?.sisyphus?.variant).toBe("medium")
     })
   })
@@ -432,7 +432,7 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then
-      expect(result.agents?.atlas?.model).toBe("openai/gpt-5.5")
+      expect(result.agents?.atlas?.model).toBe("openai/gpt-5.4")
       expect(result.agents?.atlas?.variant).toBe("medium")
     })
 
@@ -444,7 +444,7 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then
-      expect(result.agents?.metis?.model).toBe("openai/gpt-5.5")
+      expect(result.agents?.metis?.model).toBe("openai/gpt-5.4")
       expect(result.agents?.metis?.variant).toBe("high")
     })
 
@@ -456,7 +456,7 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then
-      expect(result.agents?.["sisyphus-junior"]?.model).toBe("openai/gpt-5.5")
+      expect(result.agents?.["sisyphus-junior"]?.model).toBe("openai/gpt-5.4")
       expect(result.agents?.["sisyphus-junior"]?.variant).toBe("medium")
     })
   })
@@ -470,11 +470,11 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then
-      expect(result.agents?.hephaestus?.model).toBe("openai/gpt-5.5")
+      expect(result.agents?.hephaestus?.model).toBe("openai/gpt-5.4")
       expect(result.agents?.hephaestus?.variant).toBe("medium")
     })
 
-    test("Hephaestus falls back to Copilot GPT-5.5 when only Copilot is available", () => {
+    test("Hephaestus falls back to Copilot GPT-5.4 when only Copilot is available", () => {
       // #given
       const config = createConfig({ hasCopilot: true })
 
@@ -483,7 +483,7 @@ describe("generateModelConfig", () => {
 
       // #then
       expect(result.agents?.hephaestus).toEqual({
-        model: "github-copilot/gpt-5.5",
+        model: "github-copilot/gpt-5.4",
         variant: "medium",
       })
     })
@@ -496,7 +496,7 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then
-      expect(result.agents?.hephaestus?.model).toBe("opencode/gpt-5.5")
+      expect(result.agents?.hephaestus?.model).toBe("opencode/gpt-5.4")
       expect(result.agents?.hephaestus?.variant).toBe("medium")
     })
 
@@ -665,8 +665,8 @@ describe("generateModelConfig", () => {
       // #when generateModelConfig is called
       const result = generateModelConfig(config)
 
-      // #then hephaestus should be created with gateway-routed gpt-5.5
-      expect(result.agents?.hephaestus?.model).toBe("vercel/openai/gpt-5.5")
+      // #then hephaestus should be created with gateway-routed gpt-5.4
+      expect(result.agents?.hephaestus?.model).toBe("vercel/openai/gpt-5.4")
     })
 
     test("native providers take priority over gateway", () => {
