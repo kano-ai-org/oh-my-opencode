@@ -128,4 +128,22 @@ describe("createSkillTool", () => {
     expect(clearSkillCache.mock.calls.length).toBe(baselineClearSkillCacheCalls + 2)
     expect(getAllSkills.mock.calls.length).toBe(baselineGetAllSkillsCalls + 4)
   })
+
+  it("loads a grouped Kano skill by unique short name", async () => {
+    // given
+    const groupedSkill = createMockSkill("kano/kano-jenkins-skill")
+    const skillTool = await createSkillTool({
+      skills: [
+        createMockSkill("kano-skills-meta"),
+        groupedSkill,
+      ],
+    })
+
+    // when
+    const output = await skillTool.execute({ name: "kano-jenkins-skill" }, mockContext)
+
+    // then
+    expect(String(output)).toContain("## Skill: kano/kano-jenkins-skill")
+    expect(String(output)).toContain("Test skill template for kano/kano-jenkins-skill")
+  })
 })

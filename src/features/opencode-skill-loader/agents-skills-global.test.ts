@@ -45,4 +45,44 @@ Skill body.
     expect(skill?.scope).toBe("user")
     expect(skill?.definition.description).toContain("A skill from global .agents/skills directory")
   })
+
+  it("#given grouped Kano skills in ~/.agents/skills/kano/ #when discoverGlobalAgentsSkills is called #then it discovers the meta skill and nested skills", async () => {
+    //#given
+    const agentsGlobalSkillsDir = join(TEMP_HOME, ".agents", "skills")
+    const kanoDir = join(agentsGlobalSkillsDir, "kano")
+    const jenkinsDir = join(kanoDir, "kano-jenkins-skill")
+    mkdirSync(jenkinsDir, { recursive: true })
+    writeFileSync(
+      join(kanoDir, "SKILL.md"),
+      `---
+name: kano-skills-meta
+description: Kano skills umbrella
+---
+Kano meta body.
+`,
+    )
+    writeFileSync(
+      join(jenkinsDir, "SKILL.md"),
+      `---
+name: kano-jenkins-skill
+description: Jenkins CI orchestration
+---
+Jenkins skill body.
+`,
+    )
+
+    mock.module("os", () => ({
+      homedir: () => TEMP_HOME,
+      tmpdir,
+    }))
+
+    //#when
+    const { discoverGlobalAgentsSkills } = await import(`./loader?test=${Date.now()}-${Math.random()}`)
+    const skills = await discoverGlobalAgentsSkills()
+
+    //#then
+    expect(skills.map((skill) => skill.name).sort()).toContain("kano-skills-meta")
+    expect(skills.map((skill) => skill.name).sort()).toContain("kano/kano-jenkins-skill")
+    expect(skills.find((skill) => skill.name === "kano/kano-jenkins-skill")?.scope).toBe("user")
+  })
 })
