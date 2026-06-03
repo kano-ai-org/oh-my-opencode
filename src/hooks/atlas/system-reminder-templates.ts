@@ -28,11 +28,12 @@ You have an active work plan with incomplete tasks. Continue working.
 
 RULES:
 - **FIRST**: Read the plan file NOW. If the last completed task is still unchecked, mark it \`- [x]\` IMMEDIATELY before anything else
-- Proceed without asking for permission
+- Proceed only while actionable tasks remain and measurable progress can be made
 - Use the notepad at .omo/notepads/{PLAN_NAME}/ to record learnings
-- Do not stop until all tasks are complete
-- If a task is blocked by missing external input, unavailable credentials, access limits, or a decision only the user can make, you MUST edit the plan file in this turn and change that task's checkbox from \`- [ ]\` to \`- [~]\` before moving on
-- A text-only explanation of a blocker is NOT progress. The \`- [~]\` checkbox edit is mandatory and must happen via a real file-editing tool call`
+- If blocked by missing external input, unavailable credentials, access limits, verifier timeout, missing verdict output, task-session interruption, or a decision only the user can make, STOP auto-continuation after documenting the blocker
+- If a task is blocked, you MUST edit the plan file in this turn and change that task's checkbox from \`- [ ]\` to \`- [~]\` before moving on or stopping
+- A text-only explanation of a blocker is NOT progress. The \`- [~]\` checkbox edit is mandatory and must happen via a real file-editing tool call
+- Do NOT relaunch or resume Final Verification Wave agents from auto-continuation after a timeout or missing-verdict output. Require explicit user approval/manual verification instead`
 
 export const BOULDER_COMPLETE_PROMPT = `<system-reminder>
 BOULDER COMPLETE: plan "{PLAN_NAME}" is fully checked.

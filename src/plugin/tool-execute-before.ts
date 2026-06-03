@@ -2,7 +2,11 @@ import type { PluginContext } from "./types"
 import { randomUUID } from "node:crypto"
 
 import { getMainSessionID } from "../features/claude-code-session-state"
-import { clearBoulderState } from "../features/boulder-state"
+import {
+  clearBoulderState,
+  normalizeSessionId,
+  readBoulderState,
+} from "../features/boulder-state"
 import { log, replaceToolArgs } from "../shared"
 import { stripInvisibleAgentCharacters } from "../shared/agent-display-names"
 import { resolveSessionAgent } from "./session-agent-resolver"
@@ -11,6 +15,24 @@ import { ULTRAWORK_VERIFICATION_PROMISE } from "../hooks/ralph-loop/constants"
 import { readState, writeState } from "../hooks/ralph-loop/storage"
 
 import type { CreatedHooks } from "../create-hooks"
+
+function resolveContinuationSessionFamily(directory: string, sessionID: string): string[] {
+  const normalizedTargetSessionID = normalizeSessionId(sessionID)
+  const boulderState = readBoulderState(directory)
+  if (!boulderState?.session_ids?.length) {
+    return [normalizedTargetSessionID]
+  }
+
+  const normalizedSessionIDs = Array.from(new Set(
+    boulderState.session_ids.map((candidate) => normalizeSessionId(candidate)),
+  ))
+
+  if (normalizedSessionIDs.includes(normalizedTargetSessionID)) {
+    return normalizedSessionIDs
+  }
+
+  return [normalizedTargetSessionID]
+}
 
 function getLoopCommandArguments(args: Record<string, unknown>, command: "ralph-loop" | "ulw-loop"): string {
   const rawUserMessage = typeof args.user_message === "string" ? args.user_message.trim() : ""
@@ -195,12 +217,16 @@ export function createToolExecuteBeforeHandler(args: {
       const sessionID = input.sessionID || getMainSessionID()
 
       if (command === "stop-continuation" && sessionID) {
-        hooks.stopContinuationGuard?.stop(sessionID)
+        const sessionIDsToStop = resolveContinuationSessionFamily(ctx.directory, sessionID)
+        for (const targetSessionID of sessionIDsToStop) {
+          hooks.stopContinuationGuard?.stop(targetSessionID)
+        }
         hooks.todoContinuationEnforcer?.cancelAllCountdowns()
         hooks.ralphLoop?.cancelLoop(sessionID)
         clearBoulderState(ctx.directory)
         log("[stop-continuation] All continuation mechanisms stopped", {
           sessionID,
+          sessionIDs: sessionIDsToStop,
         })
       }
 
@@ -208,11 +234,19 @@ export function createToolExecuteBeforeHandler(args: {
       // This ensures /stop-continuation persists until the user intentionally restarts.
       const workStartingCommands = ["start-work", "ralph-loop", "ulw-loop"]
       if (workStartingCommands.includes(command ?? "") && sessionID) {
-        if (hooks.stopContinuationGuard?.isStopped(sessionID)) {
-          hooks.stopContinuationGuard.clear(sessionID)
+        const sessionIDsToResume = resolveContinuationSessionFamily(ctx.directory, sessionID)
+        let clearedAny = false
+        for (const targetSessionID of sessionIDsToResume) {
+          if (hooks.stopContinuationGuard?.isStopped(targetSessionID)) {
+            hooks.stopContinuationGuard.clear(targetSessionID)
+            clearedAny = true
+          }
+        }
+        if (clearedAny) {
           log("[stop-continuation] Stop state cleared by work-starting command", {
             sessionID,
             command,
+            sessionIDs: sessionIDsToResume,
           })
         }
       }

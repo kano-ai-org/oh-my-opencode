@@ -36,6 +36,26 @@ export type PendingTaskRef =
   | { kind: "track"; task: TrackedTopLevelTaskRef }
   | { kind: "skip"; reason: "explicit_resume" }
   | { kind: "skip"; reason: "ambiguous_task_key"; task: TrackedTopLevelTaskRef }
+  | { kind: "block"; reason: "task_id_mismatch"; task: TrackedTopLevelTaskRef; details: string }
+
+export interface FinalWaveVerifierTimeoutRecord {
+  count: number
+  taskLabel?: string
+  taskTitle?: string
+  lastAt: number
+  lastOutputSnippet?: string
+}
+
+export interface SubagentTaskFailureRecord {
+  count: number
+  kind: string
+  reason: string
+  taskLabel?: string
+  taskTitle?: string
+  sessionID?: string
+  lastAt: number
+  lastOutputSnippet?: string
+}
 
 export interface SessionState {
   lastEventWasAbortError?: boolean
@@ -56,4 +76,12 @@ export interface SessionState {
   stalledContinuationPlanPath?: string
   /** The plan path the in-progress no-tool-progress counter is keyed to. Changes here reset the counter. */
   activeContinuationPlanPath?: string
+  /** Plan path that owns finalWaveVerifierTimeouts. Prevents cross-plan timeout contamination. */
+  finalWaveVerifierTimeoutPlanPath?: string
+  /** Per final-wave task timeout accounting used to stop auto-continuation when verifier sessions cannot return verdicts. */
+  finalWaveVerifierTimeouts?: Record<string, FinalWaveVerifierTimeoutRecord>
+  /** Plan path that owns terminal subagent task failures. Prevents cross-plan failure contamination. */
+  subagentTaskFailurePlanPath?: string
+  /** Per top-level task terminal subagent failures used to stop quota-burning auto-continuation loops. */
+  subagentTaskFailures?: Record<string, SubagentTaskFailureRecord>
 }

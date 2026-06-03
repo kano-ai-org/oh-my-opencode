@@ -94,6 +94,20 @@ describe("stop-continuation-guard", () => {
     // then - it should return false
     expect(guard.isStopped("non-existent-session")).toBe(false)
   })
+  test("should read persisted stopped state after guard recreation", () => {
+    // given - one guard instance stopped a session and persisted the marker
+    const input = createMockPluginInput()
+    const sessionID = "test-session-recreated"
+    const guard = createStopContinuationGuardHook(input)
+    guard.stop(sessionID)
+
+    // when - the process/hook is recreated with an empty in-memory Set
+    const recreatedGuard = createStopContinuationGuardHook(input)
+
+    // then - the persisted .omo/run-continuation stop marker still blocks continuation
+    expect(recreatedGuard.isStopped(sessionID)).toBe(true)
+  })
+
 
   test("should clear stopped state for a session", () => {
     // given - a session that was stopped

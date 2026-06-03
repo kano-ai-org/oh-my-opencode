@@ -29,6 +29,14 @@ export function resolveTaskContext(
     }
   }
 
+  if (pendingTaskRef.kind === "block") {
+    return {
+      currentTask: pendingTaskRef.task,
+      shouldSkipTaskSessionUpdate: true,
+      shouldIgnoreCurrentSessionId: true,
+    }
+  }
+
   if (pendingTaskRef.reason === "explicit_resume") {
     return {
       currentTask: readCurrentTopLevelTask(planPath),

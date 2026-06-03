@@ -23,6 +23,12 @@ export type BoulderContinuationResult =
 
 const ACTIVE_BACKGROUND_TASK_STATUSES = new Set(["pending", "running"])
 
+function isUnsafeInheritedContinuationModel(model: { providerID?: string; modelID?: string; variant?: string } | undefined): boolean {
+  const modelID = model?.modelID ?? ""
+  const variant = model?.variant ?? ""
+  return /gpt[-_]?5[.-]?5/i.test(modelID) || /gpt[-_]?5[.-]?5/i.test(variant)
+}
+
 export async function injectBoulderContinuation(input: {
   ctx: PluginInput
   sessionID: string
@@ -89,10 +95,20 @@ export async function injectBoulderContinuation(input: {
     const promptContext = await resolveRecentPromptContextForSession(ctx, sessionID)
     const inheritedTools = resolveInheritedPromptTools(sessionID, promptContext.tools)
 
-    const launchModel = promptContext.model
-      ? { providerID: promptContext.model.providerID, modelID: promptContext.model.modelID }
+    const unsafeInheritedModel = isUnsafeInheritedContinuationModel(promptContext.model)
+    if (unsafeInheritedModel) {
+      log(`[${HOOK_NAME}] Skipped unsafe model inheritance for boulder continuation`, {
+        sessionID,
+        providerID: promptContext.model?.providerID,
+        modelID: promptContext.model?.modelID,
+        variant: promptContext.model?.variant,
+      })
+    }
+    const inheritedModel = unsafeInheritedModel ? undefined : promptContext.model
+    const launchModel = inheritedModel
+      ? { providerID: inheritedModel.providerID, modelID: inheritedModel.modelID }
       : undefined
-    const launchVariant = promptContext.model?.variant
+    const launchVariant = inheritedModel?.variant
 
     const promptResult = await dispatchInternalPrompt({
       mode: "async",

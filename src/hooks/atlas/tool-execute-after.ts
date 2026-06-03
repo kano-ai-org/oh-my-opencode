@@ -17,6 +17,8 @@ import { isCallerOrchestrator } from "../../shared/session-utils"
 import { syncBackgroundLaunchSessionTracking } from "./background-launch-session-tracking"
 import { collectGitDiffStats, formatFileChanges } from "../../shared/git-worktree"
 import { shouldPauseForFinalWaveApproval } from "./final-wave-approval-gate"
+import { buildFinalWaveVerifierTimeoutReminder, getFinalWaveVerifierTimeoutBlocker, isFinalWaveTask, isFinalWaveVerifierTimeoutOutput, markFinalWaveVerifierContinuationBlocked, recordFinalWaveVerifierTimeout } from "./final-wave-timeout-fuse"
+import { buildSubagentTaskFailureReminder, classifySubagentTaskFailureOutput, getSubagentTaskFailureBlocker, markSubagentTaskFailureContinuationBlocked, recordSubagentTaskFailure } from "./subagent-task-failure-fuse"
 import { HOOK_NAME } from "./hook-name"
 import { DIRECT_WORK_REMINDER } from "./system-reminder-templates"
 import { isOmoPath } from "./omo-path"
@@ -299,6 +301,123 @@ export function createToolExecuteAfterHandler(input: {
 
         // Preserve original subagent response - critical for debugging failed tasks
         const originalResponse = toolOutput.output
+        const pendingTaskMismatch = pendingTaskRef?.kind === "block" && pendingTaskRef.reason === "task_id_mismatch"
+        const terminalTaskFailure = pendingTaskMismatch
+          ? {
+              kind: "task_id_mismatch" as const,
+              reason: pendingTaskRef.details,
+            }
+          : classifySubagentTaskFailureOutput(originalResponse)
+        const finalWaveVerifierTimedOut = !!sessionState
+          && isFinalWaveTask(currentTask)
+          && isFinalWaveVerifierTimeoutOutput(originalResponse)
+
+        if (sessionState && currentTask && terminalTaskFailure) {
+          recordSubagentTaskFailure({
+            sessionState,
+            task: currentTask,
+            classification: terminalTaskFailure,
+            output: pendingTaskMismatch ? pendingTaskRef.details : originalResponse,
+            directory: ctx.directory,
+            planPath,
+          })
+        }
+
+        if (sessionState && currentTask && finalWaveVerifierTimedOut) {
+          recordFinalWaveVerifierTimeout({
+            sessionState,
+            task: currentTask,
+            output: originalResponse,
+            directory: ctx.directory,
+            planPath,
+          })
+          const timeoutBlocker = getFinalWaveVerifierTimeoutBlocker({
+            planPath,
+            sessionState,
+            directory: ctx.directory,
+          })
+          if (timeoutBlocker) {
+            markFinalWaveVerifierContinuationBlocked({
+              sessionState,
+              planName: workScopedBoulderState.plan_name,
+              planPath,
+              blocker: timeoutBlocker,
+            })
+            if (sessionState.pendingRetryTimer) {
+              clearTimeout(sessionState.pendingRetryTimer)
+              sessionState.pendingRetryTimer = undefined
+            }
+            toolOutput.output = `
+<system-reminder>
+${buildFinalWaveVerifierTimeoutReminder({
+  planName: workScopedBoulderState.plan_name,
+  blocker: timeoutBlocker,
+})}
+</system-reminder>
+
+## FINAL VERIFICATION BLOCKED
+
+${fileChanges}
+
+---
+
+**Verifier Response:**
+
+${originalResponse}`
+            log(`[${HOOK_NAME}] Final-wave verifier timeout blocked auto-continuation`, {
+              plan: workScopedBoulderState.plan_name,
+              taskKey: currentTask.key,
+              timeoutCount: timeoutBlocker.timeoutCount,
+              pendingFinalWaveTaskCount: timeoutBlocker.pendingFinalWaveTaskCount,
+            })
+            return
+          }
+        }
+
+        if (sessionState && currentTask && terminalTaskFailure) {
+          const failureBlocker = getSubagentTaskFailureBlocker({
+            planPath,
+            sessionState,
+            directory: ctx.directory,
+          })
+          if (failureBlocker) {
+            markSubagentTaskFailureContinuationBlocked({
+              sessionState,
+              planName: workScopedBoulderState.plan_name,
+              planPath,
+              blocker: failureBlocker,
+            })
+            if (sessionState.pendingRetryTimer) {
+              clearTimeout(sessionState.pendingRetryTimer)
+              sessionState.pendingRetryTimer = undefined
+            }
+            toolOutput.output = `
+<system-reminder>
+${buildSubagentTaskFailureReminder({
+  planName: workScopedBoulderState.plan_name,
+  blocker: failureBlocker,
+})}
+</system-reminder>
+
+## SUBAGENT TASK BLOCKED
+
+${fileChanges}
+
+---
+
+**Subagent Response:**
+
+${pendingTaskMismatch ? pendingTaskRef.details : originalResponse}`
+            log(`[${HOOK_NAME}] Terminal subagent task failure blocked auto-continuation`, {
+              plan: workScopedBoulderState.plan_name,
+              taskKey: currentTask.key,
+              kind: terminalTaskFailure.kind,
+              failureCount: failureBlocker.failureCount,
+            })
+            return
+          }
+        }
+
         const shouldPauseForApproval = sessionState
           ? shouldPauseForFinalWaveApproval({
               planPath,

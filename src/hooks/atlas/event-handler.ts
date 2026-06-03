@@ -1,6 +1,10 @@
 import type { PluginInput } from "@opencode-ai/plugin"
+import { getWorkForSession, readBoulderState, resolveBoulderPlanPath, resolveBoulderPlanPathForWork } from "../../features/boulder-state"
 import { log } from "../../shared/logger"
+import { messageIsSyntheticOrInternalUser } from "../../shared/prompt-async-gate/prompt-message-state"
 import { resolveMessageEventSessionID, resolveSessionEventID } from "../../shared/event-session-id"
+import { clearPersistedFinalWaveVerifierTimeouts } from "./final-wave-timeout-fuse"
+import { clearPersistedSubagentTaskFailures } from "./subagent-task-failure-fuse"
 import { HOOK_NAME } from "./hook-name"
 import { isAbortError } from "./is-abort-error"
 import { handleAtlasSessionIdle } from "./idle-event"
@@ -56,8 +60,36 @@ export function createAtlasEventHandler(input: {
       if (state) {
         state.lastEventWasAbortError = false
         state.skipNextIdleAfterRuntimeErrorRetry = false
-        if (role === "user") {
+        const isSyntheticUserMessage = messageIsSyntheticOrInternalUser({
+          info: { role },
+          parts: props?.parts,
+        })
+        if (role === "user" && !isSyntheticUserMessage) {
           state.waitingForFinalWaveApproval = false
+          state.stalledContinuationReason = undefined
+          state.stalledContinuationPlanPath = undefined
+          state.finalWaveVerifierTimeoutPlanPath = undefined
+          state.finalWaveVerifierTimeouts = undefined
+          state.subagentTaskFailurePlanPath = undefined
+          state.subagentTaskFailures = undefined
+
+          const work = getWorkForSession(ctx.directory, sessionID)
+          const boulderState = work ? null : readBoulderState(ctx.directory)
+          const planPath = work
+            ? resolveBoulderPlanPathForWork(ctx.directory, work)
+            : boulderState
+              ? resolveBoulderPlanPath(ctx.directory, boulderState)
+              : null
+          if (planPath) {
+            clearPersistedFinalWaveVerifierTimeouts({
+              directory: ctx.directory,
+              planPath,
+            })
+            clearPersistedSubagentTaskFailures({
+              directory: ctx.directory,
+              planPath,
+            })
+          }
         }
       }
       return

@@ -24,6 +24,8 @@ import { isAmbiguousPostDispatchPromptFailure } from "../../shared/prompt-failur
 import { shouldPromptAfterSessionIdle } from "../shared/session-idle-settle"
 import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../shared/prompt-async-gate"
 import { injectBoulderContinuation } from "./boulder-continuation-injector"
+import { getFinalWaveVerifierTimeoutBlocker, markFinalWaveVerifierContinuationBlocked } from "./final-wave-timeout-fuse"
+import { getSubagentTaskFailureBlocker, markSubagentTaskFailureContinuationBlocked } from "./subagent-task-failure-fuse"
 import { HOOK_NAME } from "./hook-name"
 import { resolveActiveBoulderSession } from "./resolve-active-boulder-session"
 import { BOULDER_COMPLETE_PROMPT } from "./system-reminder-templates"
@@ -197,8 +199,38 @@ function scheduleRetry(input: {
     const normalizedSessionID = normalizeSessionId(sessionID)
     if (!currentBoulder.session_ids?.includes(normalizedSessionID)) return
 
-    const currentProgress = getPlanProgress(resolveBoulderPlanPath(ctx.directory, currentBoulder))
+    const currentPlanPath = resolveBoulderPlanPath(ctx.directory, currentBoulder)
+    const currentProgress = getPlanProgress(currentPlanPath)
     if (currentProgress.isComplete) return
+    const finalWaveTimeoutBlocker = getFinalWaveVerifierTimeoutBlocker({
+      planPath: currentPlanPath,
+      sessionState,
+      directory: ctx.directory,
+    })
+    if (finalWaveTimeoutBlocker) {
+      markFinalWaveVerifierContinuationBlocked({
+        sessionState,
+        planName: currentBoulder.plan_name,
+        planPath: currentPlanPath,
+        blocker: finalWaveTimeoutBlocker,
+      })
+      return
+    }
+
+    const subagentFailureBlocker = getSubagentTaskFailureBlocker({
+      planPath: currentPlanPath,
+      sessionState,
+      directory: ctx.directory,
+    })
+    if (subagentFailureBlocker) {
+      markSubagentTaskFailureContinuationBlocked({
+        sessionState,
+        planName: currentBoulder.plan_name,
+        planPath: currentPlanPath,
+        blocker: subagentFailureBlocker,
+      })
+      return
+    }
     if (options?.isContinuationStopped?.(sessionID)) return
     const canContinueSession = await canContinueTrackedBoulderSession({
       client: ctx.client,
@@ -377,6 +409,56 @@ export async function handleAtlasSessionIdle(input: {
   const now = Date.now()
   const activePlanPath = resolveBoulderPlanPath(ctx.directory, boulderState)
   resetStallStateForPlanChange(sessionState, activePlanPath)
+
+  const finalWaveTimeoutBlocker = getFinalWaveVerifierTimeoutBlocker({
+    planPath: activePlanPath,
+    sessionState,
+    directory: ctx.directory,
+  })
+  if (finalWaveTimeoutBlocker) {
+    markFinalWaveVerifierContinuationBlocked({
+      sessionState,
+      planName: boulderState.plan_name,
+      planPath: activePlanPath,
+      blocker: finalWaveTimeoutBlocker,
+    })
+    if (sessionState.pendingRetryTimer) {
+      clearTimeout(sessionState.pendingRetryTimer)
+      sessionState.pendingRetryTimer = undefined
+    }
+    log(`[${HOOK_NAME}] Skipped: final-wave verifier timeout requires manual verification`, {
+      sessionID,
+      plan: boulderState.plan_name,
+      timeoutCount: finalWaveTimeoutBlocker.timeoutCount,
+      pendingFinalWaveTaskCount: finalWaveTimeoutBlocker.pendingFinalWaveTaskCount,
+    })
+    return
+  }
+
+  const subagentFailureBlocker = getSubagentTaskFailureBlocker({
+    planPath: activePlanPath,
+    sessionState,
+    directory: ctx.directory,
+  })
+  if (subagentFailureBlocker) {
+    markSubagentTaskFailureContinuationBlocked({
+      sessionState,
+      planName: boulderState.plan_name,
+      planPath: activePlanPath,
+      blocker: subagentFailureBlocker,
+    })
+    if (sessionState.pendingRetryTimer) {
+      clearTimeout(sessionState.pendingRetryTimer)
+      sessionState.pendingRetryTimer = undefined
+    }
+    log(`[${HOOK_NAME}] Skipped: terminal subagent task failure requires manual intervention`, {
+      sessionID,
+      plan: boulderState.plan_name,
+      failureCount: subagentFailureBlocker.failureCount,
+      failedTaskCount: subagentFailureBlocker.failedTaskCount,
+    })
+    return
+  }
 
   if (sessionState.waitingForFinalWaveApproval) {
     log(`[${HOOK_NAME}] Skipped: waiting for explicit final-wave approval`, { sessionID })

@@ -5,7 +5,7 @@ import { isCallerOrchestrator } from "../../shared/session-utils"
 import type { PluginInput } from "@opencode-ai/plugin"
 import { existsSync, readFileSync } from "node:fs"
 import { resolve } from "node:path"
-import { getWorkForSession, readBoulderState, readCurrentTopLevelTask, resolveBoulderPlanPath, resolveBoulderPlanPathForWork } from "../../features/boulder-state"
+import { getTaskSessionState, getWorkForSession, readBoulderState, readCurrentTopLevelTask, resolveBoulderPlanPath, resolveBoulderPlanPathForWork } from "../../features/boulder-state"
 import { HOOK_NAME } from "./hook-name"
 import { ORCHESTRATOR_DELEGATION_REQUIRED, SINGLE_TASK_DIRECTIVE } from "./system-reminder-templates"
 import { isOmoPath } from "./omo-path"
@@ -72,6 +72,20 @@ export function createToolExecuteBeforeHandler(input: {
     pendingTaskRefs.set(callID, { kind: "track", task })
   }
 
+  function taskKeyDisplay(task: TrackedTopLevelTaskRef | null): string {
+    return task ? `${task.label}. ${task.title}` : "<unknown>"
+  }
+
+  function buildTaskIdMismatchPrompt(details: string): string {
+    return `<system-reminder>
+TASK_ID_MISMATCH
+
+${details}
+
+The requested task_id/prompt does not match the active top-level Boulder task. Do not perform verifier/review work. Return exactly this blocker summary and stop.
+</system-reminder>`
+  }
+
   return async (toolInput, toolOutput): Promise<void> => {
     if (!(await resolveIsCallerOrchestrator(toolInput.sessionID))) {
       return
@@ -124,26 +138,60 @@ export function createToolExecuteBeforeHandler(input: {
     // Check task - inject single-task directive
     if (toolInput.tool === "task") {
       if (toolInput.callID) {
-        const requestedSessionId = toolOutput.args.session_id as string | undefined
+        const requestedSessionId = typeof toolOutput.args.task_id === "string"
+          ? toolOutput.args.task_id
+          : typeof toolOutput.args.session_id === "string"
+            ? toolOutput.args.session_id
+            : undefined
+        const prompt = typeof toolOutput.args.prompt === "string" ? toolOutput.args.prompt : ""
+        const taskFromPrompt = parseTrackedTaskFromPrompt(prompt)
+        const boulderState = readBoulderState(ctx.directory)
+        const currentTask = boulderState
+          ? readCurrentTopLevelTask(resolveBoulderPlanPath(ctx.directory, boulderState))
+          : null
+        const currentTrackedTask = currentTask
+          ? { key: currentTask.key, label: currentTask.label, title: currentTask.title }
+          : null
+
         if (requestedSessionId) {
-          pendingTaskRefs.set(toolInput.callID, {
-            kind: "skip",
-            reason: "explicit_resume",
-          })
+          const expectedSessionId = currentTask ? getTaskSessionState(ctx.directory, currentTask.key)?.session_id : undefined
+          const promptTaskMismatch = !!taskFromPrompt && !!currentTrackedTask && taskFromPrompt.key !== currentTrackedTask.key
+          const requestedSessionMismatch = !!expectedSessionId && requestedSessionId !== expectedSessionId
+
+          if (currentTrackedTask && (promptTaskMismatch || requestedSessionMismatch)) {
+            const details = [
+              `Active Boulder task: ${taskKeyDisplay(currentTrackedTask)}`,
+              taskFromPrompt ? `Prompt task: ${taskKeyDisplay(taskFromPrompt)}` : "Prompt task: <not parsed>",
+              `Requested task_id: ${requestedSessionId}`,
+              expectedSessionId ? `Expected task_id for active task: ${expectedSessionId}` : "Expected task_id for active task: <none recorded>",
+            ].join("\n")
+            pendingTaskRefs.set(toolInput.callID, {
+              kind: "block",
+              reason: "task_id_mismatch",
+              task: currentTrackedTask,
+              details,
+            })
+            replaceToolArgs(toolOutput, {
+              prompt: buildTaskIdMismatchPrompt(details),
+              task_id: expectedSessionId ?? undefined,
+              session_id: expectedSessionId ?? undefined,
+            })
+            log(`[${HOOK_NAME}] Rewriting mismatched task_id resume into terminal task-id mismatch blocker`, {
+              sessionID: toolInput.sessionID,
+              callID: toolInput.callID,
+              activeTaskKey: currentTrackedTask.key,
+              promptTaskKey: taskFromPrompt?.key,
+              requestedSessionId,
+              expectedSessionId,
+            })
+          } else {
+            pendingTaskRefs.set(toolInput.callID, {
+              kind: "skip",
+              reason: "explicit_resume",
+            })
+          }
         } else {
-          const prompt = typeof toolOutput.args.prompt === "string" ? toolOutput.args.prompt : ""
-          const taskFromPrompt = parseTrackedTaskFromPrompt(prompt)
-          const boulderState = readBoulderState(ctx.directory)
-          const currentTask = boulderState
-            ? readCurrentTopLevelTask(resolveBoulderPlanPath(ctx.directory, boulderState))
-            : null
-          const resolvedTask = taskFromPrompt ?? (currentTask
-            ? {
-                key: currentTask.key,
-                label: currentTask.label,
-                title: currentTask.title,
-              }
-            : null)
+          const resolvedTask = taskFromPrompt ?? currentTrackedTask
           if (resolvedTask) {
             if (!taskFromPrompt) {
               log(`[${HOOK_NAME}] TASK section parse failed; falling back to current top-level task`, {

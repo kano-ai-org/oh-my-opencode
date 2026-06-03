@@ -8,10 +8,10 @@ export const CONTINUATION_PROMPT = `${createSystemDirective(SystemDirectiveTypes
 
 Incomplete tasks remain in your todo list. Continue working on the next pending task.
 
-- Proceed without asking for permission
+- Proceed only while actionable todo items remain and measurable progress can be made
 - Mark each task complete when finished
-- Do not stop until all tasks are done
-- If you believe all work is already complete, the system is questioning your completion claim. Critically re-examine each todo item from a skeptical perspective, verify the work was actually done correctly, and update the todo list accordingly.`
+- If blocked by external tools, verifier timeout, missing verdict output, access limits, or required user input, document the blocker and stop instead of retrying forever
+- If you believe all work is already complete, critically re-examine each todo item, verify the work was actually done correctly, and update the todo list accordingly.`
 
 export const COUNTDOWN_SECONDS = 2
 export const TOAST_DURATION_MS = 900

@@ -266,3 +266,65 @@ describe("injectBoulderContinuation", () => {
     expect(promptPart?.metadata?.compaction_continue).toBe(true)
   })
 })
+
+describe("injectBoulderContinuation model guard", () => {
+  beforeEach(() => {
+    _resetForTesting()
+  })
+
+  afterEach(() => {
+    _resetForTesting()
+  })
+
+  test("does not inherit GPT-5.5 for internal boulder continuation", async () => {
+    registerAgentName("atlas")
+    const capturedRequests: Array<{
+      body?: {
+        model?: { providerID: string; modelID: string }
+        variant?: string
+      }
+    }> = []
+    const promptAsyncMock = mock(async (request: unknown) => {
+      capturedRequests.push(request as typeof capturedRequests[number])
+      return undefined
+    })
+    const messagesMock = mock(async () => ({
+      data: [{
+        id: "msg_1",
+        info: {
+          agent: "atlas",
+          model: {
+            providerID: "github-copilot",
+            modelID: "gpt-5.5",
+          },
+          time: { created: Date.now() },
+        },
+      }],
+    }))
+
+    const ctx = unsafeTestValue<PluginInput>({
+      directory: "/tmp",
+      client: {
+        session: {
+          messages: messagesMock,
+          promptAsync: promptAsyncMock,
+        },
+      },
+    })
+
+    const result = await injectBoulderContinuation({
+      ctx,
+      sessionID: "ses_test_gpt55_guard",
+      planName: "test-plan",
+      remaining: 1,
+      total: 2,
+      agent: "atlas",
+      sessionState: { promptFailureCount: 0 },
+    })
+
+    expect(result).toBe("injected")
+    expect(capturedRequests).toHaveLength(1)
+    expect(capturedRequests[0]?.body?.model).toBeUndefined()
+    expect(capturedRequests[0]?.body?.variant).toBeUndefined()
+  })
+})
