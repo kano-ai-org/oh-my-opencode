@@ -92,6 +92,7 @@ import {
 } from "./session-stream-activity"
 import { isActiveSessionStatus, isTerminalSessionStatus } from "./session-status-classifier"
 import { buildFallbackBody, FALLBACK_AGENT, isAgentNotFoundError } from "./spawner"
+import { BackgroundTaskMetadataPublisher, rootSessionIdForTask } from "./status-metadata"
 import {
   createSubagentDepthLimitError,
   getMaxSubagentDepth,
@@ -263,6 +264,7 @@ export class BackgroundManager {
   private loggedSessionStatusUnavailable = false
   readonly taskHistory = new TaskHistory()
   private cachedCircuitBreakerSettings?: CircuitBreakerSettings
+  private backgroundTaskMetadataPublisher: BackgroundTaskMetadataPublisher
 
   constructor(config: BackgroundManagerConfig) {
     const { pluginContext, ...options } = config
@@ -283,6 +285,12 @@ export class BackgroundManager {
     this.enableParentSessionNotifications = options?.enableParentSessionNotifications ?? true
     this.modelFallbackControllerAccessor = options?.modelFallbackControllerAccessor
     this.logger = options?.log ?? log
+    this.backgroundTaskMetadataPublisher = new BackgroundTaskMetadataPublisher({
+      client: this.client,
+      directory: this.directory,
+      getTasks: () => this.tasks.values(),
+      log: this.logger,
+    })
     this.parentWakeNotifier = new ParentWakeNotifier(
       {
         client: this.client,
@@ -406,13 +414,16 @@ export class BackgroundManager {
     const taskIDs = this.tasksByParentSession.get(task.parentSessionId) ?? new Set<string>()
     taskIDs.add(task.id)
     this.tasksByParentSession.set(task.parentSessionId, taskIDs)
+    this.publishBackgroundTaskStatus(task)
   }
 
   private removeTask(task: BackgroundTask): void {
+    const rootSessionID = rootSessionIdForTask(task)
     this.archiveCompletedTask(task)
     archiveBackgroundTask(task)
     this.tasks.delete(task.id)
     this.removeTaskFromParentIndex(task.id, task.parentSessionId)
+    this.backgroundTaskMetadataPublisher.publishRoot(rootSessionID)
   }
 
   private archiveCompletedTask(task: BackgroundTask): void {
@@ -515,6 +526,17 @@ export class BackgroundManager {
       this.scheduleTaskRemoval(task.id)
     }
     this.updateBackgroundTaskMarker(task.parentSessionId)
+    this.publishBackgroundTaskStatus(task)
+  }
+
+  private publishBackgroundTaskStatus(task: BackgroundTask): void {
+    if (this.shutdownTriggered) return
+    this.backgroundTaskMetadataPublisher.publishTask(task)
+  }
+
+  private scheduleBackgroundTaskProgressStatus(task: BackgroundTask): void {
+    if (this.shutdownTriggered) return
+    this.backgroundTaskMetadataPublisher.scheduleProgress(task)
   }
 
   private removeTaskFromParentIndex(taskID: string, parentSessionID: string | undefined): void {
@@ -673,6 +695,7 @@ export class BackgroundManager {
             item.task.error = error instanceof Error ? error.message : String(error)
             item.task.completedAt = new Date()
           }
+          this.publishBackgroundTaskStatus(item.task)
 
           if (item.task.concurrencyKey) {
             this.concurrencyManager.release(item.task.concurrencyKey)
@@ -798,6 +821,7 @@ export class BackgroundManager {
     }
     task.concurrencyKey = concurrencyKey
     task.concurrencyGroup = concurrencyKey
+    this.publishBackgroundTaskStatus(task)
 
     if (task.retryNotification) {
       const attemptNumber = boundAttempt.attemptNumber
@@ -967,6 +991,7 @@ The fallback retry session is now created and can be inspected directly.
           existingTask.error = terminalError
           existingTask.completedAt = new Date()
         }
+        this.publishBackgroundTaskStatus(existingTask)
         if (existingTask.rootSessionId) {
           this.unregisterRootDescendant(existingTask.rootSessionId)
         }
@@ -1370,6 +1395,7 @@ The fallback retry session is now created and can be inspected directly.
       const errorMessage = errorInfo.message ?? (error instanceof Error ? error.message : String(error))
       existingTask.error = errorMessage
       existingTask.completedAt = new Date()
+      this.publishBackgroundTaskStatus(existingTask)
       if (existingTask.rootSessionId) {
         this.unregisterRootDescendant(existingTask.rootSessionId)
       }
@@ -1533,6 +1559,11 @@ The fallback retry session is now created and can be inspected directly.
         }
       }
       task.progress.lastUpdate = partInfo?.activityTime ?? new Date()
+      if (partInfo?.type && !partInfo.tool) {
+        task.progress.lastMessage = partInfo.type === "text" ? "message update" : `${partInfo.type} update`
+        task.progress.lastMessageAt = task.progress.lastUpdate
+      }
+      this.scheduleBackgroundTaskProgressStatus(task)
 
       if (partInfo?.type === "tool" || partInfo?.tool) {
         const countedToolPartIDs = task.progress.countedToolPartIDs ?? new Set<string>()
@@ -1816,6 +1847,7 @@ The fallback retry session is now created and can be inspected directly.
     }
 
     this.updateBackgroundTaskMarker(task.parentSessionId)
+    this.publishBackgroundTaskStatus(task)
     this.markForNotification(task)
     this.enqueueNotificationForParent(task.parentSessionId, () => this.notifyParentSession(task)).catch(err => {
       log("[background-agent] Failed to notify on async prompt failure:", { taskId: task.id, error: err })
@@ -1926,6 +1958,7 @@ The fallback retry session is now created and can be inspected directly.
       this.updateBackgroundTaskMarker(task.parentSessionId)
     }
 
+    this.publishBackgroundTaskStatus(task)
     this.markForNotification(task)
     this.enqueueNotificationForParent(task.parentSessionId, () => this.notifyParentSession(task)).catch(err => {
       log("[background-agent] Error in notifyParentSession for errored task:", { taskId: task.id, error: err })
@@ -1982,6 +2015,9 @@ The task was re-queued on a fallback model after a retryable failure.
       this.clearSessionTodoObservation(previousSessionID)
       clearDelegatedChildSessionBootstrap(previousSessionID)
       subagentSessions.delete(previousSessionID)
+    }
+    if (retried) {
+      this.publishBackgroundTaskStatus(task)
     }
     return retried
   }
@@ -2231,6 +2267,7 @@ The task was re-queued on a fallback model after a retryable failure.
       this.updateBackgroundTaskMarker(task.parentSessionId)
     }
 
+    this.publishBackgroundTaskStatus(task)
     if (options?.skipNotification) {
       this.cleanupPendingByParent(task)
       this.scheduleTaskRemoval(task.id)
@@ -2321,6 +2358,7 @@ The task was re-queued on a fallback model after a retryable failure.
       task.completedAt = new Date()
     }
     this.taskHistory.record(task.parentSessionId, { id: task.id, sessionID: task.sessionId, agent: task.agent, description: task.description, status: "completed", category: task.category, startedAt: task.startedAt, completedAt: task.completedAt })
+    this.publishBackgroundTaskStatus(task)
 
     if (task.rootSessionId) {
       this.unregisterRootDescendant(task.rootSessionId)
@@ -2417,6 +2455,7 @@ The task was re-queued on a fallback model after a retryable failure.
     if (allComplete) {
       this.completedTaskSummaries.delete(task.parentSessionId)
     }
+    this.publishBackgroundTaskStatus(task)
 
     const statusText = task.status === "completed"
       ? "COMPLETED"
@@ -2628,6 +2667,7 @@ The task was re-queued on a fallback model after a retryable failure.
         if (task.parentSessionId) {
           this.updateBackgroundTaskMarker(task.parentSessionId)
         }
+        this.publishBackgroundTaskStatus(task)
         this.markForNotification(task)
         this.enqueueNotificationForParent(task.parentSessionId, () => this.notifyParentSession(task)).catch(err => {
           log("[background-agent] Error in notifyParentSession for stale-pruned task:", { taskId: task.id, error: err })
@@ -2647,6 +2687,10 @@ The task was re-queued on a fallback model after a retryable failure.
       concurrencyManager: this.concurrencyManager,
       notifyParentSession: (task) => this.enqueueNotificationForParent(task.parentSessionId, () => this.notifyParentSession(task)),
       sessionStatuses: allStatuses,
+      onTaskInterrupted: (task) => {
+        removeTaskToastTracking(task.id)
+        this.publishBackgroundTaskStatus(task)
+      },
     })
   }
 
@@ -2696,6 +2740,7 @@ The task was re-queued on a fallback model after a retryable failure.
       this.updateBackgroundTaskMarker(task.parentSessionId)
     }
 
+    this.publishBackgroundTaskStatus(task)
     this.markForNotification(task)
     this.enqueueNotificationForParent(task.parentSessionId, () => this.notifyParentSession(task)).catch(err => {
       log("[background-agent] Error in notifyParentSession for crashed task:", { taskId: task.id, error: err })
@@ -2837,9 +2882,11 @@ The task was re-queued on a fallback model after a retryable failure.
     this.stopPolling()
     const trackedSessionIDs = new Set<string>()
     const abortRequests: Array<{ sessionID: string; promise: Promise<unknown> }> = []
+    const rootSessionIDs = new Set<string>()
 
     // Abort all running sessions to prevent zombie processes (#1240)
     for (const task of this.tasks.values()) {
+      rootSessionIDs.add(rootSessionIdForTask(task))
       if (task.sessionId) {
         trackedSessionIDs.add(task.sessionId)
       }
@@ -2887,6 +2934,8 @@ The task was re-queued on a fallback model after a retryable failure.
       }
     }
 
+    await this.backgroundTaskMetadataPublisher.clearRoots(rootSessionIDs)
+
     for (const timer of this.completionTimers.values()) {
       clearTimeout(timer)
     }
@@ -2898,6 +2947,7 @@ The task was re-queued on a fallback model after a retryable failure.
     this.idleDeferralTimers.clear()
 
     this.parentWakeNotifier.shutdown()
+    this.backgroundTaskMetadataPublisher.shutdown()
 
     for (const sessionID of trackedSessionIDs) {
       subagentSessions.delete(sessionID)
