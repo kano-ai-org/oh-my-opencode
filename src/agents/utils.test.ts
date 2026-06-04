@@ -1493,6 +1493,7 @@ describe("override.category expansion in createBuiltinAgents", () => {
     // #then - direct reasoningEffort wins over category
     expect(agents.oracle).toBeDefined()
     expect(agents.oracle.reasoningEffort).toBe("low")
+    expect(agents.oracle.variant).toBe("low")
   })
 
   test("standard agent override with category applies reasoningEffort from category when no direct override", async () => {
@@ -1513,6 +1514,22 @@ describe("override.category expansion in createBuiltinAgents", () => {
     // #then - category reasoningEffort is applied
     expect(agents.oracle).toBeDefined()
     expect(agents.oracle.reasoningEffort).toBe("high")
+    expect(agents.oracle.variant).toBe("high")
+  })
+
+  test("standard agent override maps direct reasoningEffort to variant when no explicit variant exists", async () => {
+    // #given - user config uses the legacy reasoningEffort field only
+    const overrides = {
+      oracle: { model: "openai/gpt-5.5", reasoningEffort: "medium" as const },
+    }
+
+    // #when
+    const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
+
+    // #then - OpenCode UI receives a model variant for the reasoning selector
+    expect(agents.oracle).toBeDefined()
+    expect(agents.oracle.reasoningEffort).toBe("medium")
+    expect(agents.oracle.variant).toBe("medium")
   })
 
   test("sisyphus override with category expands category properties", async () => {

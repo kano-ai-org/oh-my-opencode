@@ -4,6 +4,22 @@ import type { CategoryConfig } from "../../config/schema"
 import { deepMerge, migrateAgentConfig } from "../../shared"
 import { resolvePromptAppend } from "./resolve-file-uri"
 
+function withReasoningVariant(
+  config: AgentConfig,
+  reasoningEffort: unknown,
+  options?: { overwrite?: boolean }
+): AgentConfig {
+  if (typeof reasoningEffort !== "string") return config
+
+  const current = (config as AgentConfig & { variant?: unknown }).variant
+  if (!options?.overwrite && current !== undefined) return config
+
+  return {
+    ...config,
+    variant: reasoningEffort,
+  }
+}
+
 /**
  * Expands a category reference from an agent override into concrete config properties.
  * Category properties are applied unconditionally (overwriting factory defaults),
@@ -32,7 +48,7 @@ export function applyCategoryOverride(
     result.prompt = result.prompt + "\n" + resolvePromptAppend(categoryConfig.prompt_append)
   }
 
-  return result as AgentConfig
+  return withReasoningVariant(result as AgentConfig, categoryConfig.reasoningEffort)
 }
 
 export function mergeAgentConfig(
@@ -43,6 +59,8 @@ export function mergeAgentConfig(
   const migratedOverride = migrateAgentConfig(override as Record<string, unknown>) as AgentOverrideConfig
   const { prompt_append, ...rest } = migratedOverride
   const merged = deepMerge(base, rest as Partial<AgentConfig>)
+  const explicitVariant = Object.prototype.hasOwnProperty.call(rest, "variant")
+  const directReasoningEffort = (rest as { reasoningEffort?: unknown }).reasoningEffort
 
   if (merged.prompt && typeof merged.prompt === 'string' && merged.prompt.startsWith('file://')) {
     merged.prompt = resolvePromptAppend(merged.prompt, directory)
@@ -52,7 +70,9 @@ export function mergeAgentConfig(
     merged.prompt = merged.prompt + "\n" + resolvePromptAppend(prompt_append, directory)
   }
 
-  return merged
+  return withReasoningVariant(merged, directReasoningEffort ?? (merged as { reasoningEffort?: unknown }).reasoningEffort, {
+    overwrite: !explicitVariant && typeof directReasoningEffort === "string",
+  })
 }
 
 export function applyOverrides(

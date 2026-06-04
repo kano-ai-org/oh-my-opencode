@@ -282,4 +282,70 @@ describe("buildPrometheusAgentConfig", () => {
     // then
     expect(result.mode).toBe("primary");
   });
+
+  test("maps direct reasoningEffort to variant when no explicit variant exists", async () => {
+    // given
+
+    // when
+    const result = await buildPrometheusAgentConfig({
+      configAgentPlan: undefined,
+      pluginPrometheusOverride: {
+        model: "openai/gpt-5.5",
+        reasoningEffort: "xhigh",
+      },
+      userCategories: undefined,
+      currentModel: undefined,
+    });
+
+    // then
+    expect(result.reasoningEffort).toBe("xhigh");
+    expect(result.variant).toBe("xhigh");
+  });
+
+  test("keeps explicit variant over direct reasoningEffort", async () => {
+    // given
+
+    // when
+    const result = await buildPrometheusAgentConfig({
+      configAgentPlan: undefined,
+      pluginPrometheusOverride: {
+        model: "openai/gpt-5.5",
+        variant: "high",
+        reasoningEffort: "xhigh",
+      },
+      userCategories: undefined,
+      currentModel: undefined,
+    });
+
+    // then
+    expect(result.reasoningEffort).toBe("xhigh");
+    expect(result.variant).toBe("high");
+  });
+
+  test("maps category reasoningEffort to variant when category has no explicit variant", async () => {
+    // given
+    resolveCategoryConfigSpy.mockReturnValue({
+      model: "openai/gpt-5.5",
+      reasoningEffort: "high",
+    } as CategoryConfig);
+
+    // when
+    const result = await buildPrometheusAgentConfig({
+      configAgentPlan: undefined,
+      pluginPrometheusOverride: {
+        category: "deep-plan",
+      },
+      userCategories: {
+        "deep-plan": {
+          model: "openai/gpt-5.5",
+          reasoningEffort: "high",
+        },
+      },
+      currentModel: undefined,
+    });
+
+    // then
+    expect(result.reasoningEffort).toBe("high");
+    expect(result.variant).toBe("high");
+  });
 });

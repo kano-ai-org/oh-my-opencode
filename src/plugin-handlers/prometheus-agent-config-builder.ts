@@ -82,9 +82,14 @@ export async function buildPrometheusAgentConfig(params: {
   const resolvedModel = modelResolution?.model;
   const resolvedVariant = modelResolution?.variant;
 
-  const variantToUse = params.pluginPrometheusOverride?.variant ?? resolvedVariant;
   const reasoningEffortToUse =
     params.pluginPrometheusOverride?.reasoningEffort ?? categoryConfig?.reasoningEffort;
+  const variantToUse =
+    params.pluginPrometheusOverride?.variant ??
+    params.pluginPrometheusOverride?.reasoningEffort ??
+    categoryConfig?.variant ??
+    resolvedVariant ??
+    categoryConfig?.reasoningEffort;
   const textVerbosityToUse =
     params.pluginPrometheusOverride?.textVerbosity ?? categoryConfig?.textVerbosity;
   const thinkingToUse = params.pluginPrometheusOverride?.thinking ?? categoryConfig?.thinking;
