@@ -192,13 +192,13 @@ describe("BackgroundManager pollRunningTasks", () => {
       //#when
       const poll = manager["pollRunningTasks"]
       await poll.call(manager)
-      await manager.shutdown()
 
       //#then
       expect(task.status).toBe("running")
       expect(task.error).toBeUndefined()
       expect(task.consecutiveMissedPolls).toBe(1)
       expect(getSession).not.toHaveBeenCalled()
+      await manager.shutdown()
     })
 
     test("#when status polling is unavailable #then it does not complete or increment missed polls", async () => {
@@ -427,6 +427,99 @@ describe("BackgroundManager pollRunningTasks", () => {
       //#then
       expect(task.status).toBe("running")
       expect(task.error).toBeUndefined()
+    })
+
+    test("#when active status is stale but session history has terminal assistant output #then completes the task", async () => {
+      //#given
+      const originalDateNow = Date.now
+      Date.now = () => 1_781_094_200_000
+      let messagesCallCount = 0
+      let todoCallCount = 0
+      const manager = createManagerWithClient({
+        status: async () => ({ data: { "ses-busy-terminal": { type: "busy" } } }),
+        get: async () => ({
+          data: {
+            id: "ses-busy-terminal",
+            time: { updated: Date.now() - 60_000 },
+          },
+        }),
+        messages: async () => {
+          messagesCallCount += 1
+          return {
+            data: [{
+              info: { role: "user" },
+              parts: [{ type: "text", text: "go" }],
+            }, {
+              info: { role: "assistant", finish: "stop" },
+              parts: [{ type: "text", text: "done" }],
+            }],
+          }
+        },
+        todo: async () => {
+          todoCallCount += 1
+          return { data: [] }
+        },
+      })
+      const task = createRunningTask("ses-busy-terminal")
+      task.startedAt = new Date(Date.now() - 120_000)
+      task.progress = { toolCalls: 1, lastUpdate: new Date(Date.now() - 120_000) }
+      injectTask(manager, task)
+
+      try {
+        //#when
+        const poll = manager["pollRunningTasks"]
+        await poll.call(manager)
+
+        //#then
+        expect(task.status).toBe("completed")
+        expect(task.completedAt).toBeDefined()
+        expect(messagesCallCount).toBe(1)
+        expect(todoCallCount).toBe(1)
+      } finally {
+        Date.now = originalDateNow
+        await manager.shutdown()
+      }
+    })
+
+    test("#when active status is stale but latest assistant is still waiting on tool calls #then keeps the task running", async () => {
+      //#given
+      const originalDateNow = Date.now
+      Date.now = () => 1_781_094_200_000
+      const manager = createManagerWithClient({
+        status: async () => ({ data: { "ses-busy-tool-calls": { type: "busy" } } }),
+        get: async () => ({
+          data: {
+            id: "ses-busy-tool-calls",
+            time: { updated: Date.now() - 60_000 },
+          },
+        }),
+        messages: async () => ({
+          data: [{
+            info: { role: "user" },
+            parts: [{ type: "text", text: "go" }],
+          }, {
+            info: { role: "assistant", finish: "tool-calls" },
+            parts: [{ type: "tool", state: { status: "completed" } }],
+          }],
+        }),
+      })
+      const task = createRunningTask("ses-busy-tool-calls")
+      task.startedAt = new Date(Date.now() - 120_000)
+      task.progress = { toolCalls: 1, lastUpdate: new Date(Date.now() - 120_000) }
+      injectTask(manager, task)
+
+      try {
+        //#when
+        const poll = manager["pollRunningTasks"]
+        await poll.call(manager)
+
+        //#then
+        expect(task.status).toBe("running")
+        expect(task.completedAt).toBeUndefined()
+      } finally {
+        Date.now = originalDateNow
+        await manager.shutdown()
+      }
     })
   })
 

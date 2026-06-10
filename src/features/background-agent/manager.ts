@@ -54,6 +54,7 @@ import {
 } from "./compaction-aware-message-resolver"
 import { ConcurrencyManager } from "./concurrency"
 import {
+  ACTIVE_SESSION_COMPLETION_RECOVERY_IDLE_MS,
   POLLING_INTERVAL_MS,
   type QueueItem,
   TASK_CLEANUP_DELAY_MS,
@@ -83,6 +84,7 @@ import {
   verifySessionExists as verifySessionStillExists,
 } from "./session-existence"
 import { handleSessionIdleBackgroundEvent } from "./session-idle-event-handler"
+import { getSessionActivityFromClient } from "./session-activity"
 import {
   hasOutputSignalFromPart,
   isMessagePartForSession,
@@ -101,6 +103,7 @@ import {
 } from "./subagent-spawn-limits"
 import { TaskHistory } from "./task-history"
 import { checkAndInterruptStaleTasks, pruneStaleTasksAndNotifications, type SessionStatusMap } from "./task-poller"
+import { refreshTaskActivityFromSession } from "./task-activity-refresh"
 import {
   archiveBackgroundTask,
   forgetBackgroundTask,
@@ -129,6 +132,23 @@ type ResumeTaskSnapshot = {
   parentTools?: Record<string, boolean>
   concurrencyKey?: string
   concurrencyGroup?: string
+}
+
+type SessionCompletionHistoryMessage = {
+  info?: {
+    role?: string
+    finish?: string
+  }
+  role?: string
+  finish?: string
+  parts?: Array<{
+    type?: string
+    text?: string
+    content?: unknown
+    state?: {
+      status?: unknown
+    }
+  }>
 }
 
 const TERMINAL_BACKGROUND_TASK_STATUSES = new Set<BackgroundTask["status"]>([
@@ -2118,6 +2138,110 @@ The task was re-queued on a fallback model after a retryable failure.
     }
   }
 
+  private getCompletionHistoryRole(message: SessionCompletionHistoryMessage): string | undefined {
+    return message.info?.role ?? message.role
+  }
+
+  private getCompletionHistoryFinish(message: SessionCompletionHistoryMessage): string | undefined {
+    return message.info?.finish ?? message.finish
+  }
+
+  private isPendingCompletionHistoryToolPart(part: NonNullable<SessionCompletionHistoryMessage["parts"]>[number]): boolean {
+    if (
+      part.type !== "tool"
+      && part.type !== "tool_use"
+      && part.type !== "tool-call"
+      && part.type !== "tool-invocation"
+    ) {
+      return false
+    }
+
+    const status = part.state?.status
+    return status === "pending" || status === "running"
+  }
+
+  private isTerminalCompletionFinish(finish: string | undefined): boolean {
+    return !!finish && finish !== "tool-calls" && finish !== "unknown"
+  }
+
+  private async sessionHistoryLooksTerminal(sessionID: string): Promise<boolean> {
+    let messages: SessionCompletionHistoryMessage[]
+    try {
+      const response = await messagesInDirectory(this.client, {
+        path: { id: sessionID },
+      }, this.directory)
+      messages = normalizeSDKResponse(response, [] as SessionCompletionHistoryMessage[], { preferResponseOnMissingData: true })
+    } catch (error) {
+      log("[background-agent] Failed to inspect session history for completion recovery:", {
+        sessionID,
+        error,
+      })
+      return false
+    }
+
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      const message = messages[index]
+      if (!message) continue
+
+      const role = this.getCompletionHistoryRole(message)
+      if (role === "user") {
+        return false
+      }
+      if (role !== "assistant") {
+        continue
+      }
+
+      if (message.parts?.some((part) => this.isPendingCompletionHistoryToolPart(part)) === true) {
+        return false
+      }
+
+      return this.isTerminalCompletionFinish(this.getCompletionHistoryFinish(message))
+    }
+
+    return false
+  }
+
+  private async tryRecoverActiveSessionCompletion(
+    task: BackgroundTask,
+    sessionID: string,
+    statusType: string,
+  ): Promise<boolean> {
+    if (statusType === "retry") {
+      return false
+    }
+
+    const activityRefresh = await refreshTaskActivityFromSession(
+      task,
+      (id) => getSessionActivityFromClient(this.client, id, this.directory),
+    )
+    if (activityRefresh.type !== "activity") {
+      return false
+    }
+
+    const quietMs = Date.now() - activityRefresh.activityTime
+    if (quietMs < ACTIVE_SESSION_COMPLETION_RECOVERY_IDLE_MS) {
+      return false
+    }
+
+    const terminalHistory = await this.sessionHistoryLooksTerminal(sessionID)
+    if (!terminalHistory || task.status !== "running") {
+      return false
+    }
+
+    const hasIncompleteTodos = await this.checkSessionTodos(sessionID)
+    if (hasIncompleteTodos || task.status !== "running") {
+      return false
+    }
+
+    log("[background-agent] Recovering completed task from terminal history despite active session status:", {
+      taskId: task.id,
+      sessionID,
+      statusType,
+      quietMs,
+    })
+    return this.tryCompleteTask(task, `polling (terminal history after active ${statusType} status)`)
+  }
+
   private clearNotificationsForTask(taskId: string): void {
     for (const [sessionID, tasks] of this.notifications.entries()) {
       const filtered = tasks.filter((t) => t.id !== taskId)
@@ -2798,6 +2922,9 @@ The task was re-queued on a fallback model after a retryable failure.
           // Only skip completion when session status is actively running.
           // Unknown or terminal statuses (like "interrupted") fall through to completion.
           if (sessionStatus && isActiveSessionStatus(sessionStatus.type)) {
+            if (await this.tryRecoverActiveSessionCompletion(task, sessionID, sessionStatus.type)) {
+              continue
+            }
             log("[background-agent] Session still running, relying on event-based progress:", {
               taskId: task.id,
               sessionID,
