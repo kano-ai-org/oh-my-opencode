@@ -6,7 +6,11 @@ import {
   normalizeSDKResponse,
 } from "../../shared"
 import { isSessionActive as isOpenCodeSessionActive, settleAfterSessionIdle } from "../../hooks/shared/session-idle-settle"
-import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../../hooks/shared/prompt-async-gate"
+import {
+  dispatchInternalPrompt,
+  isInternalPromptDispatchAccepted,
+  releasePromptAsyncReservation,
+} from "../../hooks/shared/prompt-async-gate"
 import { isPromptMessageInspectionAborted } from "../../shared/prompt-async-gate/message-inspection-error"
 import type { PromptDispatchClient } from "../../shared/prompt-async-gate/types"
 import {
@@ -21,6 +25,7 @@ import {
   type ParentWakePromptContext,
   type PendingParentWake,
 } from "./parent-wake-dedupe"
+import { FALLBACK_AGENT, isAgentNotFoundError } from "./spawner"
 import { getParentWakeMessageActivityAt, getParentWakeMessageCreatedAt } from "./parent-wake-message-activity"
 
 type OpencodeClient = PluginInput["client"]
@@ -216,35 +221,54 @@ export class ParentWakeNotifier {
     this.pendingParentWakes.delete(sessionID)
 
     const notificationContent = latestWake.notifications.join("\n\n")
+    const dispatchWakePrompt = (promptContext: ParentWakePromptContext) => dispatchInternalPrompt({
+      mode: "async",
+      client: this.deps.client,
+      sessionID,
+      source: "background-agent-parent-wake",
+      settleMs: 0,
+      queueBehavior: "defer",
+      checkStatus: true,
+      checkToolState: !toolWaitDecision.skipPromptGateToolStateCheck,
+      input: {
+        path: { id: sessionID },
+        body: {
+          noReply: !latestWake.shouldReply,
+          ...promptContext,
+          parts: [createInternalAgentTextPart(notificationContent)],
+        },
+        query: { directory: this.deps.directory },
+      },
+    })
 
     let dispatchStartedAt = Date.now()
+    let wakeForDispatch = latestWake
     try {
       dispatchStartedAt = Date.now()
-      const promptResult = await dispatchInternalPrompt({
-        mode: "async",
-        client: this.deps.client,
-        sessionID,
-        source: "background-agent-parent-wake",
-        settleMs: 0,
-        queueBehavior: "defer",
-        checkStatus: true,
-        checkToolState: !toolWaitDecision.skipPromptGateToolStateCheck,
-        input: {
-          path: { id: sessionID },
-          body: {
-            noReply: !latestWake.shouldReply,
-            ...latestWake.promptContext,
-            parts: [createInternalAgentTextPart(notificationContent)],
-          },
-          query: { directory: this.deps.directory },
-        },
-      })
+      let promptResult = await dispatchWakePrompt(latestWake.promptContext)
+      if (
+        promptResult.status === "failed"
+        && this.shouldRetryParentWakeWithFallbackAgent(promptResult.error, latestWake.promptContext)
+      ) {
+        const fallbackPromptContext = this.createFallbackParentWakePromptContext(latestWake.promptContext)
+        const released = releasePromptAsyncReservation(sessionID, "background-agent-parent-wake")
+        const fallbackWake = cloneParentWake(latestWake)
+        fallbackWake.promptContext = fallbackPromptContext
+        wakeForDispatch = fallbackWake
+        log("[background-agent] Parent wake agent not found, retrying with fallback agent:", {
+          sessionID,
+          original: latestWake.promptContext.agent,
+          fallback: fallbackPromptContext.agent,
+          reservationReleased: released,
+        })
+        promptResult = await dispatchWakePrompt(fallbackPromptContext)
+      }
       if (promptResult.status === "failed") {
         if (isAmbiguousPostDispatchPromptFailure(promptResult)) {
-          const dispatchedWake = cloneParentWake(latestWake)
+          const dispatchedWake = cloneParentWake(wakeForDispatch)
           dispatchedWake.dispatchedAt = dispatchStartedAt
           if (await this.hasAcceptedMessageAfterDispatchedParentWake(sessionID, dispatchedWake)) {
-            this.trackDispatchedParentWake(sessionID, latestWake, dispatchStartedAt)
+            this.trackDispatchedParentWake(sessionID, wakeForDispatch, dispatchStartedAt)
             log("[background-agent] Treated failed parent wake prompt as accepted after observing session history:", {
               sessionID,
               error: promptResult.error,
@@ -277,9 +301,9 @@ export class ParentWakeNotifier {
         return
       }
       log("[background-agent] Sent deferred parent wake:", { sessionID })
-      this.trackDispatchedParentWake(sessionID, latestWake, dispatchStartedAt)
+      this.trackDispatchedParentWake(sessionID, wakeForDispatch, dispatchStartedAt)
     } catch (error) {
-      this.requeueWake(sessionID, latestWake)
+      this.requeueWake(sessionID, wakeForDispatch)
       this.schedulePendingParentWakeFlush(sessionID)
       log("[background-agent] Failed to send deferred parent wake:", { sessionID, error })
     }
@@ -383,6 +407,21 @@ export class ParentWakeNotifier {
     }
     this.recentParentSessionActivity.delete(sessionID)
     return false
+  }
+
+  private shouldRetryParentWakeWithFallbackAgent(error: unknown, promptContext: ParentWakePromptContext): boolean {
+    return promptContext.agent !== undefined
+      && promptContext.agent !== FALLBACK_AGENT
+      && isAgentNotFoundError(error)
+  }
+
+  private createFallbackParentWakePromptContext(promptContext: ParentWakePromptContext): ParentWakePromptContext {
+    return {
+      ...promptContext,
+      agent: FALLBACK_AGENT,
+      ...(promptContext.model ? { model: { ...promptContext.model } } : {}),
+      ...(promptContext.tools ? { tools: { ...promptContext.tools } } : {}),
+    }
   }
 
   private trackDispatchedParentWake(sessionID: string, wake: PendingParentWake, dispatchedAt: number): void {

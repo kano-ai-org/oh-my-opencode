@@ -289,4 +289,32 @@ describe("ParentWakeNotifier — same-source reservation requeue (BUG-E)", () =>
       releaseAllPromptAsyncReservationsForTesting()
     }
   })
+
+  test("#given a parent wake uses a removed custom agent #when dispatch fails #then it retries with general immediately", async () => {
+    // given
+    const { notifier, promptAsyncCalls } = createNotifier({
+      promptAsyncImpl: async (_call, attempt) => {
+        if (attempt === 1) {
+          throw new Error('Agent not found: "Sisyphus - ultraworker". Available agents: build, explore, general, plan')
+        }
+        return { data: {} }
+      },
+    })
+    const sessionID = "parent-custom-agent-gone"
+    notifier.queuePendingParentWake(sessionID, "security review interrupted", { agent: "Sisyphus - ultraworker" }, true)
+
+    try {
+      // when
+      await notifier.flushPendingParentWake(sessionID)
+
+      // then
+      expect(promptAsyncCalls).toHaveLength(2)
+      expect(promptAsyncCalls[0]?.body.agent).toBe("Sisyphus - ultraworker")
+      expect(promptAsyncCalls[1]?.body.agent).toBe("general")
+      expect(notifier.getPendingParentWakes().has(sessionID)).toBe(false)
+    } finally {
+      notifier.shutdown()
+      releaseAllPromptAsyncReservationsForTesting()
+    }
+  })
 })
