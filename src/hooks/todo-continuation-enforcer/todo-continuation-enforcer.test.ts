@@ -373,6 +373,35 @@ describe("todo-continuation-enforcer", () => {
     expect(promptCalls).toHaveLength(0)
   })
 
+  test("should not inject when the only remaining in-progress todo is waiting for user approval", async () => {
+    // given - session where the last remaining todo is a user-input gate
+    const sessionID = "main-user-approval-gate"
+    setMainSession(sessionID)
+
+    const mockInput = createMockPluginInput()
+    mockInput.client.session.todo = async () => ({ data: [
+      { id: "1", content: "Implementation task", status: "completed", priority: "high" },
+      {
+        id: "2",
+        content: "BLOCKED on user post-verification approval gate - user must explicitly say \"okay\" to complete",
+        status: "in_progress",
+        priority: "high",
+      },
+    ]})
+
+    const hook = createTodoContinuationEnforcer(mockInput, {})
+
+    // when - session goes idle
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+
+    await fakeTimers.advanceBy(3000)
+
+    // then - no continuation injected because there is no actionable todo
+    expect(promptCalls).toHaveLength(0)
+  })
+
   test("should not inject when background tasks are running", async () => {
     // given - session with running background tasks
     const sessionID = "main-789"
