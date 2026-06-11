@@ -99,6 +99,7 @@ export async function executeUnstableAgentTask(
     const pollStart = Date.now()
     let lastMsgCount = 0
     let stablePolls = 0
+    let emptySessionSince: number | undefined
     let terminalStatus: { status: string; error?: string } | undefined
     let completedDuringMonitoring = false
 
@@ -139,6 +140,22 @@ export async function executeUnstableAgentTask(
         preferResponseOnMissingData: true,
       })
       const currentMsgCount = msgs.length
+      if (currentMsgCount === 0) {
+        stablePolls = 0
+        lastMsgCount = 0
+        emptySessionSince = emptySessionSince ?? Date.now()
+        if (Date.now() - emptySessionSince >= timingCfg.WAIT_FOR_SESSION_TIMEOUT_MS) {
+          cleanupReason = "Monitored unstable background task produced no session messages"
+          terminalStatus = {
+            status: "error",
+            error: `Subagent session ${sessionID} produced no messages within ${timingCfg.WAIT_FOR_SESSION_TIMEOUT_MS}ms after launch.`,
+          }
+          break
+        }
+        continue
+      }
+
+      emptySessionSince = undefined
 
       if (currentMsgCount === lastMsgCount) {
         stablePolls++
@@ -196,7 +213,19 @@ ${taskMetadataBlock}`
       .sort((a, b) => (b.info?.time?.created ?? 0) - (a.info?.time?.created ?? 0))
 
     if (assistantMessages.length === 0) {
-      return `No assistant response found (task ran in background mode).\n\nSession ID: ${sessionID}`
+      cleanupReason = "Monitored unstable background task completed without assistant response"
+      const duration = formatDuration(startTime)
+      return `SUPERVISED TASK FAILED (empty-response)
+
+Task reached a stable idle state without creating an assistant response.
+
+Duration: ${duration}
+Agent: ${agentToUse}${args.category ? ` (category: ${args.category})` : ""}
+Model: ${actualModel}
+Session ID: ${sessionID}
+Background Task ID: ${task.id}
+
+${taskMetadataBlock}`
     }
 
     let textContent = ""

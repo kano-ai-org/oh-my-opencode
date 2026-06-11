@@ -134,6 +134,47 @@ describe("executeUnstableAgentTask cleanup", () => {
     expect(cancelCalls[0]?.taskId).toBe("bg_timeout_cleanup")
   })
 
+  test("cancels launched task when monitored session never produces messages", async () => {
+    // given
+    const { executeUnstableAgentTask } = require("./unstable-agent-task")
+    const cancelCalls: Array<{ taskId: string; options?: Record<string, unknown> }> = []
+
+    const mockManager = {
+      launch: async () => ({ id: "bg_empty_cleanup", sessionId: "ses_empty_cleanup", status: "running" }),
+      getTask: () => ({ id: "bg_empty_cleanup", sessionId: "ses_empty_cleanup", status: "running" }),
+      cancelTask: async (taskId: string, options?: Record<string, unknown>) => {
+        cancelCalls.push({ taskId, options })
+        return true
+      },
+    }
+
+    // when
+    const result = await executeUnstableAgentTask(
+      createArgs(),
+      createToolContext(),
+      {
+        manager: mockManager,
+        client: {
+          session: {
+            status: async () => ({ data: { ses_empty_cleanup: { type: "idle" } } }),
+            messages: async () => ({ data: [] }),
+          },
+        },
+      },
+      createParentContext(),
+      "test-agent",
+      undefined,
+      undefined,
+      "gpt-test"
+    )
+
+    // then
+    expect(result).toContain("SUPERVISED TASK FAILED")
+    expect(result).toContain("produced no messages")
+    expect(cancelCalls).toHaveLength(1)
+    expect(cancelCalls[0]?.taskId).toBe("bg_empty_cleanup")
+  })
+
   test("cancels launched task when parent aborts while waiting for session start", async () => {
     // given
     const { executeUnstableAgentTask } = require("./unstable-agent-task")
