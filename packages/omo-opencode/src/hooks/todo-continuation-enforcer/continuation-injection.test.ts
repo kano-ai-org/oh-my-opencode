@@ -51,6 +51,48 @@ describe("injectContinuation", () => {
     expect(capturedAgent).toBe("Sisyphus - ultraworker")
   })
 
+  test("#given only a user-approval gate remains #when injection rechecks todos #then it skips promptAsync", async () => {
+    // given
+    let promptCalls = 0
+    const ctx = {
+      directory: "/tmp/test",
+      client: {
+        session: {
+          todo: async () => ({ data: [
+            { id: "1", content: "Implementation task", status: "completed", priority: "high" },
+            {
+              id: "2",
+              content: "Await user post-verification approval gate before marking complete",
+              status: "in_progress",
+              priority: "high",
+            },
+          ] }),
+          promptAsync: async () => {
+            promptCalls += 1
+            return {}
+          },
+        },
+      },
+    }
+    const sessionStateStore = {
+      getExistingState: () => ({ inFlight: false, lastInjectedAt: 0, consecutiveFailures: 0 }),
+    }
+
+    // when
+    await injectContinuation({
+      ctx: ctx as never,
+      sessionID: "ses_user_approval_gate",
+      resolvedInfo: {
+        agent: "Sisyphus - ultraworker",
+        model: { providerID: "anthropic", modelID: "claude-sonnet-4-20250514" },
+      },
+      sessionStateStore: sessionStateStore as never,
+    })
+
+    // then
+    expect(promptCalls).toBe(0)
+  })
+
   test("#given resolved agent name still carries a ZWSP sort prefix #when continuation is injected #then promptAsync receives the agent name without the ZWSP prefix", async () => {
     // given
     let capturedAgent: string | undefined
