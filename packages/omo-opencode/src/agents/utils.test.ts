@@ -166,7 +166,7 @@ describe("createBuiltinAgents with model overrides", () => {
 
     // #then
     expect(agents.sisyphus.model).toBe("github-copilot/gpt-5.5")
-    expect(agents.sisyphus.reasoningEffort).toBe("medium")
+    expect(agents.sisyphus.reasoningEffort).toBe("xhigh")
     expect(agents.sisyphus.thinking).toBeUndefined()
     providerModelsSpy.mockRestore()
     fetchSpy.mockRestore()
