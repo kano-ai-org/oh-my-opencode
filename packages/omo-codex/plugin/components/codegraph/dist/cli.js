@@ -10030,13 +10030,13 @@ async function removeEmptyDirectory(path) {
 function sleep(ms) {
   return new Promise((resolve9) => setTimeout(resolve9, ms));
 }
-function resolveCodegraphTarExecutable(platform = process.platform, env = process.env, fileExists = existsSync5) {
+function resolveCodegraphTarExecutable(platform = process.platform, env = process.env, fileExists = existsSync9) {
   if (platform !== "win32")
     return "tar";
   const systemRoot = env.SystemRoot ?? env.WINDIR;
   if (systemRoot === undefined || systemRoot.length === 0)
     return "tar";
-  const candidate = join6(systemRoot, "System32", "tar.exe");
+  const candidate = join18(systemRoot, "System32", "tar.exe");
   return fileExists(candidate) ? candidate : "tar";
 }
 async function defaultDownloader(asset, timeoutMs = DEFAULT_DOWNLOAD_TIMEOUT_MS) {
