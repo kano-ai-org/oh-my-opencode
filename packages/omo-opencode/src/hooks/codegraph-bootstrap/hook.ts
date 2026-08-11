@@ -4,6 +4,7 @@ import { join } from "node:path"
 
 import {
   buildCodegraphEnv,
+  codegraphCommandRequiresSupportedLocalNode,
   ensureCodegraphGitignored,
   ensureCodegraphProvisioned,
   prepareCodegraphWorkspace,
@@ -106,7 +107,7 @@ async function resolveOrProvisionCommand(
   if (resolved.exists) return resolved
   if (config.auto_provision === false) return null
   const nodeSupport = deps.nodeSupport()
-  if (!nodeSupport.supported) {
+  if (!nodeSupport.supported && resolved.source !== "provisioned") {
     deps.log("[codegraph-bootstrap] CodeGraph unsupported on this Node runtime; skipping bootstrap", {
       major: nodeSupport.major,
       reason: nodeSupport.reason,
@@ -153,7 +154,7 @@ async function runBootstrap(
       return
     }
     const nodeSupport = deps.nodeSupport()
-    if (command.source !== "bundled" && command.source !== "env" && !nodeSupport.supported) {
+    if (codegraphCommandRequiresSupportedLocalNode(command) && !nodeSupport.supported) {
       deps.log("[codegraph-bootstrap] CodeGraph unsupported on this Node runtime; skipping bootstrap", {
         major: nodeSupport.major,
         projectRoot,

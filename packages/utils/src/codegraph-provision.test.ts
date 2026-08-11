@@ -6,7 +6,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { CODEGRAPH_PROVISION_MANIFEST } from "./codegraph/manifest"
-import { ensureCodegraphProvisioned } from "./codegraph/provision"
+import { ensureCodegraphProvisioned, resolveCodegraphTarExecutable } from "./codegraph/provision"
 
 const ARCHIVE_EXTRACTION_TEST_TIMEOUT_MS = 15_000
 
@@ -21,11 +21,12 @@ function fixtureArchive(
   const rootName = options.rootName ?? "codegraph-darwin-arm64"
   const executableName = options.executableName ?? "codegraph"
   const archive = join(root, `${rootName}.tar.gz`)
+  const tarCommand = resolveCodegraphTarExecutable(process.platform, process.env)
   const binDir = join(root, rootName, "bin")
   mkdirSync(binDir, { recursive: true })
   writeFileSync(join(binDir, executableName), "#!/bin/sh\nprintf 'codegraph fixture\\n'\n")
   execFileSync("chmod", ["755", join(binDir, executableName)])
-  execFileSync("tar", ["-czf", archive, rootName], { cwd: root })
+  execFileSync(tarCommand, ["-czf", archive, rootName], { cwd: root })
   const bytes = readFileSync(archive)
   const sha256 = createHash("sha256").update(bytes).digest("hex")
   rmSync(root, { force: true, recursive: true })
@@ -104,6 +105,26 @@ describe("ensureCodegraphProvisioned", () => {
       sha256: "8d57ced73b24d35f758f2ede2318e80e1d7241987f37a999e3d80edb6fddf961",
       url: "https://registry.npmjs.org/@colbymchenry/codegraph-win32-arm64/-/codegraph-win32-arm64-1.0.1.tgz",
     })
+  })
+
+  it("prefers Windows system tar.exe when present", () => {
+    // given
+    const env = { SystemRoot: "C:\\Windows" }
+    const tarPath = join("C:\\Windows", "System32", "tar.exe")
+
+    // when
+    const result = resolveCodegraphTarExecutable("win32", env, (filePath) => filePath === tarPath)
+
+    // then
+    expect(result).toBe(tarPath)
+  })
+
+  it("falls back to PATH tar when Windows system tar.exe is missing", () => {
+    // when
+    const result = resolveCodegraphTarExecutable("win32", { SystemRoot: "C:\\Windows" }, () => false)
+
+    // then
+    expect(result).toBe("tar")
   })
 
   it("extracts a verified npm tgz archive and installs bin/codegraph.cmd", async () => {

@@ -1,6 +1,11 @@
 import { existsSync } from "node:fs"
 import { join } from "node:path"
-import { buildCodegraphEnv, resolveCodegraphCommand, resolveCodegraphNodeSupport } from "@oh-my-opencode/utils"
+import {
+  buildCodegraphEnv,
+  codegraphCommandRequiresSupportedLocalNode,
+  resolveCodegraphCommand,
+  resolveCodegraphNodeSupport,
+} from "@oh-my-opencode/utils"
 import type { ResolveCodegraphCommandOptions } from "@oh-my-opencode/utils"
 import type { CodegraphConfig } from "../config/schema/codegraph"
 import type { LocalMcpConfig } from "./lsp"
@@ -60,7 +65,8 @@ export function createCodegraphMcpConfig(options: CodegraphMcpConfigOptions = {}
     which,
   })
   const enabled =
-    resolvedCommand.exists && (resolvedCommand.source === "bundled" || resolvedCommand.source === "env" || nodeSupport.supported)
+    resolvedCommand.exists &&
+    (!codegraphCommandRequiresSupportedLocalNode(resolvedCommand) || nodeSupport.supported)
 
   return {
     type: "local",
