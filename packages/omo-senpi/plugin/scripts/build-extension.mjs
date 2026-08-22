@@ -211,7 +211,6 @@ export async function checkExtensionCurrent(options = {}) {
 function run(command, args) {
   const result = spawnSync(command, args, {
     cwd: repoRoot,
-    shell: process.platform === "win32",
     stdio: "inherit",
   })
   if (result.error !== undefined) throw result.error
