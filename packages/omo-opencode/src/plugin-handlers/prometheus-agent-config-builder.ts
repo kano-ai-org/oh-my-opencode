@@ -91,10 +91,10 @@ export async function buildPrometheusAgentConfig(params: {
       )?.variant
     : undefined;
 
-  const variantToUse =
-    params.pluginPrometheusOverride?.variant ?? resolvedVariant ?? currentModelVariant;
   const reasoningToUse =
     params.pluginPrometheusOverride?.reasoning ?? categoryConfig?.reasoning;
+  const variantToUse =
+    reasoningToUse ?? params.pluginPrometheusOverride?.variant ?? resolvedVariant ?? currentModelVariant;
   const reasoningEffortToUse =
     params.pluginPrometheusOverride?.reasoningEffort ?? categoryConfig?.reasoningEffort;
   const textVerbosityToUse =
@@ -136,6 +136,7 @@ export async function buildPrometheusAgentConfig(params: {
 
   const { prompt, prompt_append, ...restOverride } = override;
   const merged = { ...base, ...restOverride };
+  if (reasoningToUse !== undefined) merged.variant = reasoningToUse;
   if (typeof merged.prompt === "string") {
     for (const promptAddition of [prompt, prompt_append]) {
       if (promptAddition) {
