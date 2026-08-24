@@ -35,7 +35,7 @@ import { isCompactionGuardActive } from "./compaction-guard"
 import { getMessageDir } from "./message-directory"
 import { isTokenLimitError } from "./token-limit-detection"
 import { isUnrecoverableRequestError } from "./unrecoverable-request-error"
-import { getIncompleteCount } from "./todo"
+import { getIncompleteCount, isActionableTodo } from "./todo"
 import type { ResolvedMessageInfo, Todo } from "./types"
 import type { SessionStateStore } from "./session-state"
 
@@ -165,7 +165,7 @@ export async function injectContinuation(args: {
     return
   }
 
-  const incompleteTodos = todos.filter((todo) => todo.status !== "completed" && todo.status !== "cancelled")
+  const incompleteTodos = todos.filter(isActionableTodo)
   const todoList = incompleteTodos.map((todo) => `- [${todo.status}] ${todo.content}`).join("\n")
   const prompt = `${CONTINUATION_PROMPT}
 

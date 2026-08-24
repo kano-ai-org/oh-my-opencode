@@ -168,6 +168,21 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
       expect(result.reasoningEffort).toBe("xhigh")
     })
 
+    test("#given canonical reasoning #when agent is created #then lowers it to the OpenCode variant", () => {
+      // given
+      const override = {
+        model: "minimax/MiniMax-M3",
+        reasoning: "thinking",
+        variant: "none",
+      }
+
+      // when
+      const result = createSisyphusJuniorAgentWithOverrides(override)
+
+      // then
+      expect(result.variant).toBe("thinking")
+    })
+
     test("#given GPT model with reasoningEffort override only #when agent is created #then honors reasoningEffort without injecting variant", () => {
       // given
       const override = { model: "openai/gpt-5.6-sol", reasoningEffort: "high" as const }

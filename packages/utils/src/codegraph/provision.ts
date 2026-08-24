@@ -77,6 +77,18 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
+export function resolveCodegraphTarExecutable(
+  platform = process.platform,
+  env: NodeJS.ProcessEnv = process.env,
+  fileExists: (filePath: string) => boolean = existsSync,
+): string {
+  if (platform !== "win32") return "tar"
+  const systemRoot = env["SystemRoot"] ?? env["WINDIR"]
+  if (systemRoot === undefined || systemRoot.length === 0) return "tar"
+  const candidate = join(systemRoot, "System32", "tar.exe")
+  return fileExists(candidate) ? candidate : "tar"
+}
+
 async function defaultDownloader(asset: CodegraphProvisionAsset, timeoutMs = DEFAULT_DOWNLOAD_TIMEOUT_MS): Promise<Uint8Array> {
   const response = await fetch(asset.url, { signal: AbortSignal.timeout(timeoutMs) })
   if (!response.ok) throw new Error(`download failed with HTTP ${response.status}`)
@@ -142,7 +154,7 @@ async function acquireLock(lockPath: string, waitMs: number, staleMs: number): P
 }
 
 async function extractTarGz(archivePath: string, destinationDir: string): Promise<void> {
-  await execFileAsync("tar", ["-xzf", archivePath, "-C", destinationDir])
+  await execFileAsync(resolveCodegraphTarExecutable(), ["-xzf", archivePath, "-C", destinationDir])
 }
 
 async function installExtractedBundle(extractDir: string, installDir: string, executableName: string): Promise<string> {
