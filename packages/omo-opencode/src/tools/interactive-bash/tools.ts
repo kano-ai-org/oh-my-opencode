@@ -7,14 +7,10 @@ import {
   INTERACTIVE_BASH_DESCRIPTION,
   PROHIBITED_TMUX_SUBCOMMANDS,
 } from "./constants"
-import { getCachedTmuxPath } from "./tmux-path-resolver"
+import { collectProcessResult } from "./process-output"
+import { getTmuxPath } from "./tmux-path-resolver"
 
 const GLOBAL_TMUX_OPTIONS_WITH_ARGS = new Set(["-L", "-S", "-f", "-c", "-T"])
-
-function ignoreInteractiveBashKillError(error: unknown): void {
-  if (error instanceof Error) return
-  throw error
-}
 
 function resolveTmuxExecutable(tmuxPath: string): string[] {
   if (!isCmuxCompatEnvironment()) {
@@ -155,7 +151,6 @@ type InteractiveBashArgs = {
 
 export async function executeInteractiveBash(args: InteractiveBashArgs): Promise<string> {
   try {
-    const tmuxPath = getCachedTmuxPath() ?? "tmux"
 
     const parts = tokenizeCommand(args.tmux_command)
 
@@ -175,40 +170,17 @@ export async function executeInteractiveBash(args: InteractiveBashArgs): Promise
       return buildBlockedTmuxCommandMessage(rawSubcommand, parts)
     }
 
+    const tmuxPath = await getTmuxPath()
+    if (!tmuxPath) {
+      return "Error: No supported tmux executable found (tmux 2.0 or newer is required)"
+    }
+
     const proc = spawnWithWindowsHide([...resolveTmuxExecutable(tmuxPath), ...parts], {
       stdout: "pipe",
       stderr: "pipe",
     })
 
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      const id = setTimeout(() => {
-        const timeoutError = new Error(`Timeout after ${DEFAULT_TIMEOUT_MS}ms`)
-        try {
-          proc.kill()
-          // Fire-and-forget: wait for process exit in background to avoid zombies
-          void proc.exited.catch((error) => {
-            ignoreInteractiveBashKillError(error)
-          })
-        } catch (error) {
-          if (!(error instanceof Error)) throw error
-          // Ignore kill errors; we'll still reject with timeoutError below
-        }
-        reject(timeoutError)
-      }, DEFAULT_TIMEOUT_MS)
-      proc.exited
-        .then(() => clearTimeout(id))
-        .catch(() => clearTimeout(id))
-    })
-
-    // Read stdout and stderr in parallel to avoid race conditions
-    const [stdout, stderr, exitCode] = await Promise.race([
-      Promise.all([
-        new Response(proc.stdout).text(),
-        new Response(proc.stderr).text(),
-        proc.exited,
-      ]),
-      timeoutPromise,
-    ])
+    const { stdout, stderr, exitCode } = await collectProcessResult(proc, DEFAULT_TIMEOUT_MS)
 
     // Check exitCode properly - return error even if stderr is empty
     if (exitCode !== 0) {
