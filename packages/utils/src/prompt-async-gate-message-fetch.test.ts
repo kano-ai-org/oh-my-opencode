@@ -76,4 +76,49 @@ describe("dispatchInternalPrompt message fetch safety", () => {
     expect(result.status).toBe("queued")
     expect(promptCalls).toBe(0)
   })
+
+  test("#given a large parent session #when the latest assistant is inspected #then only the newest message page is requested", async () => {
+    // given
+    let messagesInput: unknown
+    let promptCalls = 0
+    const client = {
+      session: {
+        status: async () => ({ data: { ses_large_parent: { type: "idle" } } }),
+        messages: async (input: unknown) => {
+          messagesInput = input
+          return { data: [] }
+        },
+        promptAsync: async () => {
+          promptCalls += 1
+        },
+      },
+    }
+
+    // when
+    const result = await dispatchInternalPrompt({
+      mode: "async",
+      client,
+      sessionID: "ses_large_parent",
+      input: {
+        path: { id: "ses_large_parent" },
+        query: { directory: "D:\\_work\\_Hikari\\Hikari" },
+        body: { parts: [] },
+      },
+      source: "test:bounded-message-fetch",
+      settleMs: 0,
+      postDispatchHoldMs: 0,
+      dispatchTimeoutMs: 50,
+    })
+
+    // then
+    expect(result.status).toBe("dispatched")
+    expect(promptCalls).toBe(1)
+    expect(messagesInput).toEqual({
+      path: { id: "ses_large_parent" },
+      query: {
+        directory: "D:\\_work\\_Hikari\\Hikari",
+        limit: 5,
+      },
+    })
+  })
 })
