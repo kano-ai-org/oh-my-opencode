@@ -32,7 +32,13 @@ import {
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { applySessionPromptParams } from "../../shared/session-prompt-params-helpers"
 import { setSessionTools } from "../../shared/session-tools-store"
-import { clearSessionAgent, setSessionAgent, subagentSessions, updateSessionAgent } from "../claude-code-session-state"
+import {
+  clearSessionAgent,
+  registerBackgroundTaskSession,
+  setSessionAgent,
+  unregisterBackgroundTaskSession,
+  updateSessionAgent,
+} from "../claude-code-session-state"
 import { MESSAGE_STORAGE } from "../hook-message-injector"
 import { getTaskToastManager } from "../task-toast-manager"
 import { abortWithTimeout } from "./abort-with-timeout"
@@ -796,14 +802,14 @@ export class BackgroundManager {
 
     await input.onSessionCreated?.(sessionID)
     this.settlePreStartDescendantReservation(task)
-    subagentSessions.add(sessionID)
+    registerBackgroundTaskSession(sessionID)
     setSessionAgent(sessionID, input.agent)
 
     if (this.tasks.get(task.id)?.status === "cancelled") {
       clearDelegatedChildSessionBootstrap(sessionID)
       clearSessionAgent(sessionID)
       await this.abortSessionWithLogging(sessionID, "cancelled during launch setup")
-      subagentSessions.delete(sessionID)
+      unregisterBackgroundTaskSession(sessionID)
       if (task.rootSessionId) {
         this.unregisterRootDescendant(task.rootSessionId)
       }
@@ -816,7 +822,7 @@ export class BackgroundManager {
       clearDelegatedChildSessionBootstrap(sessionID)
       clearSessionAgent(sessionID)
       await this.abortSessionWithLogging(sessionID, "stale attempt binding cleanup")
-      subagentSessions.delete(sessionID)
+      unregisterBackgroundTaskSession(sessionID)
       if (task.rootSessionId) {
         this.unregisterRootDescendant(task.rootSessionId)
       }
@@ -1221,7 +1227,7 @@ The fallback retry session is now created and can be inspected directly.
       }
 
       if (existingTask.sessionId) {
-        subagentSessions.add(existingTask.sessionId)
+        registerBackgroundTaskSession(existingTask.sessionId)
       }
       this.startPolling()
 
@@ -1270,7 +1276,7 @@ The fallback retry session is now created and can be inspected directly.
     }
 
     this.addTask(task)
-    subagentSessions.add(input.sessionId)
+    registerBackgroundTaskSession(input.sessionId)
     this.startPolling()
     this.taskHistory.record(input.parentSessionId, { id: task.id, sessionID: input.sessionId, agent: input.agent || "task", description: input.description, status: "running", startedAt: task.startedAt })
 
@@ -1341,7 +1347,7 @@ The fallback retry session is now created and can be inspected directly.
 
     this.startPolling()
     if (existingTask.sessionId) {
-      subagentSessions.add(existingTask.sessionId)
+      registerBackgroundTaskSession(existingTask.sessionId)
     }
 
     if (input.parentSessionId) {
@@ -2187,7 +2193,7 @@ The task was re-queued on a fallback model after a retryable failure.
       this.clearSessionOutputObserved(previousSessionID)
       this.clearSessionTodoObservation(previousSessionID)
       clearDelegatedChildSessionBootstrap(previousSessionID)
-      subagentSessions.delete(previousSessionID)
+      unregisterBackgroundTaskSession(previousSessionID)
     }
     return retried
   }
@@ -2350,7 +2356,7 @@ The task was re-queued on a fallback model after a retryable failure.
       this.removeTask(task)
       this.clearTaskHistoryWhenParentTasksGone(task.parentSessionId)
       if (task.sessionId) {
-        subagentSessions.delete(task.sessionId)
+        unregisterBackgroundTaskSession(task.sessionId)
         clearDelegatedChildSessionBootstrap(task.sessionId)
         SessionCategoryRegistry.remove(task.sessionId)
       }
@@ -2562,7 +2568,7 @@ The task was re-queued on a fallback model after a retryable failure.
       }
 
       if (task.sessionId) {
-        subagentSessions.delete(task.sessionId)
+        unregisterBackgroundTaskSession(task.sessionId)
         clearSessionAgent(task.sessionId)
         clearDelegatedChildSessionBootstrap(task.sessionId)
         SessionCategoryRegistry.remove(task.sessionId)
@@ -3180,7 +3186,7 @@ The task was re-queued on a fallback model after a retryable failure.
     this.parentWakeNotifier.shutdown()
 
     for (const sessionID of trackedSessionIDs) {
-      subagentSessions.delete(sessionID)
+      unregisterBackgroundTaskSession(sessionID)
       clearDelegatedChildSessionBootstrap(sessionID)
       SessionCategoryRegistry.remove(sessionID)
     }

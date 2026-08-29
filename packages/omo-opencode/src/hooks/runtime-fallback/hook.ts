@@ -4,6 +4,8 @@ import { DEFAULT_CONFIG } from "./constants"
 import { createEventHandler } from "./event-handler"
 import { createFirstPromptWatchdog, observeEventForWatchdog } from "./first-prompt-watchdog"
 import { createMessageUpdateHandler } from "./message-update-handler"
+import { isBackgroundTaskSession } from "../../features/claude-code-session-state"
+import { resolveMessageEventSessionID, resolveSessionEventID } from "../../shared/event-session-id"
 import type { HookDeps, RuntimeFallbackHook, RuntimeFallbackInterval, RuntimeFallbackOptions, RuntimeFallbackPluginInput, RuntimeFallbackTimeout } from "./types"
 
 declare function setInterval(callback: () => void, delay?: number): RuntimeFallbackInterval
@@ -24,6 +26,16 @@ const defaultRuntimeFallbackHookFactories: RuntimeFallbackHookFactories = {
   createMessageUpdateHandler,
   createChatMessageHandler,
   createFirstPromptWatchdog,
+}
+
+function resolveHookEventSessionID(event: { type: string; properties?: unknown }): string | undefined {
+  const properties = event.properties
+  if (typeof properties !== "object" || properties === null) {
+    return undefined
+  }
+
+  const props = properties as Record<string, unknown>
+  return resolveMessageEventSessionID(props) ?? resolveSessionEventID(props)
 }
 
 export function createRuntimeFallbackHook(
@@ -80,6 +92,11 @@ export function createRuntimeFallbackHook(
   }
 
   const eventHandler = async ({ event }: { event: { type: string; properties?: unknown } }) => {
+    const sessionID = resolveHookEventSessionID(event)
+    if (sessionID && isBackgroundTaskSession(sessionID)) {
+      return
+    }
+
     ensureInterval()
 
     if (config.enabled) {
@@ -117,7 +134,12 @@ export function createRuntimeFallbackHook(
 
   return {
     event: eventHandler,
-    "chat.message": chatMessageHandler,
+    "chat.message": async (input, output) => {
+      if (isBackgroundTaskSession(input.sessionID)) {
+        return
+      }
+      await chatMessageHandler(input, output)
+    },
     dispose,
   } as RuntimeFallbackHook
 }
