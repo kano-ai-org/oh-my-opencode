@@ -247,13 +247,14 @@ describe("buildPrometheusAgentConfig", () => {
       // when
       const result = await buildPrometheusAgentConfig({
         configAgentPlan: undefined,
-        pluginPrometheusOverride: { category: "test-category", reasoning: "low" },
+        pluginPrometheusOverride: { category: "test-category", reasoning: "low", variant: "max" },
         userCategories: { "test-category": { reasoning: "high" } },
         currentModel: undefined,
       });
 
       // then
       expect(result.reasoning).toBe("low");
+      expect(result.variant).toBe("low");
     });
   });
 

@@ -156,8 +156,9 @@ export function createSisyphusJuniorAgentWithOverrides(
     base.top_p = override.top_p
   }
 
-  if (override?.variant !== undefined) {
-    base.variant = override.variant
+  const variant = override?.reasoning ?? override?.variant
+  if (variant !== undefined) {
+    base.variant = variant
   }
 
   if (isGptModel(model)) {
