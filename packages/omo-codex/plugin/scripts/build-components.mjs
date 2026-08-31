@@ -6,6 +6,8 @@ import { builtinModules } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { createComponentBuildEnv } from "./component-build-env.mjs";
+
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const packageJson = JSON.parse(await readFile(join(root, "package.json"), "utf8"));
 const workspaces = Array.isArray(packageJson.workspaces) ? packageJson.workspaces : [];
@@ -103,6 +105,7 @@ function runCaptured(command, args, cwd, label) {
 		const child = spawn(command, args, {
 			cwd,
 			shell: process.platform === "win32",
+			env: createComponentBuildEnv(),
 			stdio: ["ignore", "pipe", "pipe"],
 		});
 		const chunks = [];
