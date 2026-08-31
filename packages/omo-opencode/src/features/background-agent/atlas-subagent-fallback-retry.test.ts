@@ -5,6 +5,7 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { _resetMemCacheForTesting as resetConnectedProvidersCacheForTesting } from "../../shared/connected-providers-cache"
 import { releaseAllPromptAsyncReservationsForTesting } from "../../shared/prompt-async-gate"
 import {
+  backgroundTaskSessions,
   getSessionAgent,
   _resetForTesting as resetClaudeCodeSessionState,
   subagentSessions,
@@ -159,6 +160,8 @@ describe("Atlas-spawned subagent runtime fallback", () => {
     expect(promptCalls).toHaveLength(2)
     expect(subagentSessions.has("ses_primary")).toBe(false)
     expect(subagentSessions.has("ses_fallback")).toBe(true)
+    expect(backgroundTaskSessions.has("ses_primary")).toBe(false)
+    expect(backgroundTaskSessions.has("ses_fallback")).toBe(true)
     expect(getSessionAgent("ses_fallback")).toBe("oracle")
 
     manager.shutdown()
