@@ -17,20 +17,26 @@ import { isPromptMessageInspectionAborted } from "./message-inspection-error"
 import { withDispatchTimeout } from "./timing"
 import type { PromptDispatchClient, PromptMessagesQuery, PromptSessionName } from "./types"
 
+// The latest turn and adjacent internal markers are enough to detect an active assistant.
+const DEFAULT_PROMPT_GATE_MESSAGES_LIMIT = 5
+
 function getPromptQuery(input: unknown): PromptMessagesQuery {
   if (!isRecord(input)) {
-    return { directory: "" }
+    return { directory: "", limit: DEFAULT_PROMPT_GATE_MESSAGES_LIMIT }
   }
   const query = input.query
   if (!isRecord(query)) {
-    return { directory: "" }
+    return { directory: "", limit: DEFAULT_PROMPT_GATE_MESSAGES_LIMIT }
   }
 
-  const promptQuery: PromptMessagesQuery = { directory: "" }
+  const promptQuery: PromptMessagesQuery = {
+    directory: "",
+    limit: DEFAULT_PROMPT_GATE_MESSAGES_LIMIT,
+  }
   if (typeof query.directory === "string") {
     return typeof query.limit === "number"
       ? { directory: query.directory, limit: query.limit }
-      : { directory: query.directory }
+      : { directory: query.directory, limit: DEFAULT_PROMPT_GATE_MESSAGES_LIMIT }
   }
   if (typeof query.limit === "number") {
     return { ...promptQuery, limit: query.limit }
