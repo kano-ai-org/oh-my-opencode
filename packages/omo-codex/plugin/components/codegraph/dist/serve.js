@@ -265,6 +265,15 @@ async function removeEmptyDirectory(path) {
 function sleep(ms) {
   return new Promise((resolve2) => setTimeout(resolve2, ms));
 }
+function resolveCodegraphTarExecutable(platform = process.platform, env = process.env, fileExists = existsSync2) {
+  if (platform !== "win32")
+    return "tar";
+  const systemRoot = env["SystemRoot"] ?? env["WINDIR"];
+  if (systemRoot === undefined || systemRoot.length === 0)
+    return "tar";
+  const candidate = join3(systemRoot, "System32", "tar.exe");
+  return fileExists(candidate) ? candidate : "tar";
+}
 async function defaultDownloader(asset, timeoutMs = DEFAULT_DOWNLOAD_TIMEOUT_MS) {
   const response = await fetch(asset.url, { signal: AbortSignal.timeout(timeoutMs) });
   if (!response.ok)
@@ -324,7 +333,7 @@ async function acquireLock(lockPath, waitMs, staleMs) {
   return null;
 }
 async function extractTarGz(archivePath, destinationDir) {
-  await execFileAsync("tar", ["-xzf", archivePath, "-C", destinationDir]);
+  await execFileAsync(resolveCodegraphTarExecutable(), ["-xzf", archivePath, "-C", destinationDir]);
 }
 async function installExtractedBundle(extractDir, installDir, executableName) {
   const roots = await readdir(extractDir);
