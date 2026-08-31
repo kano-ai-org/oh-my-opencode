@@ -10,6 +10,7 @@ import * as loggerModule from "../../shared/logger"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import {
   _resetForTesting as resetClaudeCodeSessionState,
+  backgroundTaskSessions,
   subagentSessions,
 } from "../../features/claude-code-session-state"
 import {
@@ -717,6 +718,56 @@ describe("runtime-fallback", () => {
       const fallbackLog = logCalls.find((c) => c.msg.includes("Preparing fallback"))
       expect(fallbackLog).toBeDefined()
       expect(fallbackLog?.data).toMatchObject({ from: "openai/gpt-5.5", to: "anthropic/claude-opus-4-7" })
+    })
+
+    test("should delegate managed background session fallback to BackgroundManager", async () => {
+      const retriedModels: string[] = []
+      const hook = createRuntimeFallbackHook(
+        createMockPluginInput({
+          session: {
+            promptAsync: async (args: unknown) => {
+              const model = (args as { body?: { model?: { providerID?: string; modelID?: string } } })?.body?.model
+              if (model?.providerID && model?.modelID) {
+                retriedModels.push(`${model.providerID}/${model.modelID}`)
+              }
+              return {}
+            },
+          },
+        }),
+        {
+          config: createMockConfig({ notify_on_fallback: false }),
+          pluginConfig: createMockPluginConfigWithCategoryFallback(["openai/gpt-5.6-luna"]),
+        },
+      )
+
+      const sessionID = "test-managed-background-session"
+      subagentSessions.add(sessionID)
+      backgroundTaskSessions.add(sessionID)
+      SessionCategoryRegistry.register(sessionID, "test")
+
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID, model: "minimax/MiniMax-M3" } },
+        },
+      })
+
+      await hook.event({
+        event: {
+          type: "message.updated",
+          properties: {
+            info: {
+              sessionID,
+              role: "assistant",
+              model: "minimax/MiniMax-M3",
+              status: "The Token Plan usage limit has been reached. (2067)",
+            },
+          },
+        },
+      })
+
+      expect(retriedModels).toEqual([])
+      expect(logCalls.find((call) => call.msg.includes("Preparing fallback"))).toBeUndefined()
     })
 
     test("should trigger fallback on auto-retry signal in assistant text parts", async () => {

@@ -1,8 +1,23 @@
 import { getAgentConfigKey } from "../../shared/agent-display-names"
 
 export const subagentSessions = new Set<string>()
+export const backgroundTaskSessions = new Set<string>()
 export const syncSubagentSessions = new Set<string>()
 export const handedBackSyncSessions = new Set<string>()
+
+export function registerBackgroundTaskSession(sessionID: string): void {
+  subagentSessions.add(sessionID)
+  backgroundTaskSessions.add(sessionID)
+}
+
+export function unregisterBackgroundTaskSession(sessionID: string): void {
+  subagentSessions.delete(sessionID)
+  backgroundTaskSessions.delete(sessionID)
+}
+
+export function isBackgroundTaskSession(sessionID: string): boolean {
+  return backgroundTaskSessions.has(sessionID)
+}
 
 let _mainSessionID: string | undefined
 
@@ -77,6 +92,7 @@ export function resolveRegisteredAgentName(name: string | undefined): string | u
 export function _resetForTesting(): void {
   _mainSessionID = undefined
   subagentSessions.clear()
+  backgroundTaskSessions.clear()
   syncSubagentSessions.clear()
   handedBackSyncSessions.clear()
   sessionAgentMap.clear()
