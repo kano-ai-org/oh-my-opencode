@@ -14,7 +14,7 @@ var __export = (target, all) => {
     });
 };
 
-// components/codegraph/src/serve.ts
+// src/serve.ts
 import { existsSync as existsSync7, realpathSync as realpathSync3 } from "node:fs";
 import { homedir as homedir6 } from "node:os";
 import { basename as basename4, join as join12, resolve as resolve5 } from "node:path";
@@ -27,7 +27,7 @@ import {
 } from "node:process";
 import { fileURLToPath } from "node:url";
 
-// ../../utils/src/codegraph/env.ts
+// ../../../../utils/src/codegraph/env.ts
 import { homedir } from "node:os";
 import { join } from "node:path";
 var CODEGRAPH_INSTALL_DIR_ENV = "CODEGRAPH_INSTALL_DIR";
@@ -103,16 +103,16 @@ function buildCodegraphChildEnv(options = {}) {
   return env;
 }
 
-// ../../utils/src/codegraph/managed-runtime.ts
+// ../../../../utils/src/codegraph/managed-runtime.ts
 import { existsSync, readFileSync } from "node:fs";
 import { join as join2, resolve } from "node:path";
 
-// ../../utils/src/record-type-guard.ts
+// ../../../../utils/src/record-type-guard.ts
 function isPlainRecord(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-// ../../utils/src/codegraph/manifest.ts
+// ../../../../utils/src/codegraph/manifest.ts
 var CODEGRAPH_PINNED_VERSION = "1.5.0";
 var CODEGRAPH_PROVISION_MANIFEST = {
   assets: {
@@ -150,7 +150,7 @@ var CODEGRAPH_PROVISION_MANIFEST = {
   version: CODEGRAPH_PINNED_VERSION
 };
 
-// ../../utils/src/codegraph/managed-runtime.ts
+// ../../../../utils/src/codegraph/managed-runtime.ts
 function managedBinPath(installDir, platform) {
   return join2(installDir, "bin", platform === "win32" ? "codegraph.cmd" : "codegraph");
 }
@@ -195,7 +195,7 @@ function parseProvisionMarker(text) {
   }
 }
 
-// ../../utils/src/codegraph/node-support.ts
+// ../../../../utils/src/codegraph/node-support.ts
 var CODEGRAPH_MIN_NODE_MAJOR = 20;
 var CODEGRAPH_BLOCKED_NODE_MAJOR = 25;
 var CODEGRAPH_UNSAFE_NODE_ENV = "CODEGRAPH_ALLOW_UNSAFE_NODE";
@@ -224,7 +224,7 @@ function parseNodeMajor(version) {
   return Number.isNaN(major) ? 0 : major;
 }
 
-// ../../utils/src/codegraph/provision.ts
+// ../../../../utils/src/codegraph/provision.ts
 import { createHash, randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
 import { chmod, mkdir, readdir, readFile, rename, rm, rmdir, stat, writeFile } from "node:fs/promises";
@@ -413,14 +413,14 @@ async function ensureCodegraphProvisioned(options) {
   }
 }
 
-// ../../utils/src/codegraph/resolve.ts
+// ../../../../utils/src/codegraph/resolve.ts
 import { existsSync as existsSync3 } from "node:fs";
 import { homedir as homedir3 } from "node:os";
 import { spawnSync } from "node:child_process";
 import { basename as basename2, dirname, join as join5 } from "node:path";
 import { createRequire } from "node:module";
 
-// ../../utils/src/runtime/which.ts
+// ../../../../utils/src/runtime/which.ts
 import { accessSync, constants } from "node:fs";
 import { delimiter, join as join4 } from "node:path";
 var runtime = globalThis;
@@ -485,7 +485,7 @@ function bunWhich(commandName) {
   return null;
 }
 
-// ../../utils/src/codegraph/resolve.ts
+// ../../../../utils/src/codegraph/resolve.ts
 function codegraphCommandRequiresSupportedLocalNode(resolution) {
   return resolution.source !== "bundled" && resolution.source !== "env" && resolution.source !== "provisioned";
 }
@@ -612,7 +612,7 @@ function resolveCodegraphCommand(options = {}) {
   };
 }
 
-// ../../utils/src/codegraph/exclusion.ts
+// ../../../../utils/src/codegraph/exclusion.ts
 import { realpathSync } from "node:fs";
 import { homedir as homedir4, tmpdir as osTmpdir } from "node:os";
 import { isAbsolute, join as join6, resolve as resolve2 } from "node:path";
@@ -677,10 +677,10 @@ function shouldExcludeCodegraphProject(workspace, options = {}) {
   }
   return { excluded: false };
 }
-// shared/src/config-loader.ts
+// ../../shared/src/config-loader.ts
 import { homedir as homedir5 } from "node:os";
 
-// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/core.js
+// ../../../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/core.js
 var _a;
 function $constructor(name, initializer, params) {
   function init(inst, def) {
@@ -755,7 +755,7 @@ function config(newConfig) {
     Object.assign(globalConfig, newConfig);
   return globalConfig;
 }
-// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/util.js
+// ../../../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/util.js
 var exports_util = {};
 __export(exports_util, {
   BIGINT_FORMAT_RANGES: () => BIGINT_FORMAT_RANGES,
@@ -1447,7 +1447,7 @@ class Class {
   constructor(..._args) {}
 }
 
-// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/errors.js
+// ../../../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/errors.js
 var initializer = (inst, def) => {
   inst.name = "$ZodError";
   Object.defineProperty(inst, "_zod", {
@@ -1516,7 +1516,7 @@ function formatError(error, mapper = (issue2) => issue2.message) {
   return fieldErrors;
 }
 
-// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/parse.js
+// ../../../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/parse.js
 var _parse = (_Err) => (schema, value, _ctx, _params) => {
   const ctx = _ctx ? { ..._ctx, async: false } : { async: false };
   const result = schema._zod.run({ value, issues: [] }, ctx);
@@ -1593,7 +1593,7 @@ var _safeEncodeAsync = (_Err) => async (schema, value, _ctx) => {
 var _safeDecodeAsync = (_Err) => async (schema, value, _ctx) => {
   return _safeParseAsync(_Err)(schema, value, _ctx);
 };
-// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/regexes.js
+// ../../../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/regexes.js
 var cuid = /^[cC][0-9a-z]{6,}$/;
 var cuid2 = /^[0-9a-z]+$/;
 var ulid = /^[0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{26}$/;
@@ -1650,7 +1650,7 @@ var boolean = /^(?:true|false)$/i;
 var lowercase = /^[^A-Z]*$/;
 var uppercase = /^[^a-z]*$/;
 
-// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/checks.js
+// ../../../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/checks.js
 var $ZodCheck = /* @__PURE__ */ $constructor("$ZodCheck", (inst, def) => {
   var _a2;
   inst._zod ?? (inst._zod = {});
@@ -2039,7 +2039,7 @@ var $ZodCheckOverwrite = /* @__PURE__ */ $constructor("$ZodCheckOverwrite", (ins
   };
 });
 
-// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/doc.js
+// ../../../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/doc.js
 class Doc {
   constructor(args = []) {
     this.content = [];
@@ -2077,14 +2077,14 @@ class Doc {
   }
 }
 
-// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/versions.js
+// ../../../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/versions.js
 var version = {
   major: 4,
   minor: 4,
   patch: 3
 };
 
-// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/schemas.js
+// ../../../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/schemas.js
 var $ZodType = /* @__PURE__ */ $constructor("$ZodType", (inst, def) => {
   var _a2;
   inst ?? (inst = {});
@@ -3540,7 +3540,7 @@ function handleRefineResult(result, payload, input, inst) {
     payload.issues.push(issue(_iss));
   }
 }
-// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/registries.js
+// ../../../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/registries.js
 var _a2;
 var $output = Symbol("ZodOutput");
 var $input = Symbol("ZodInput");
@@ -3590,7 +3590,7 @@ function registry() {
 }
 (_a2 = globalThis).__zod_globalRegistry ?? (_a2.__zod_globalRegistry = registry());
 var globalRegistry = globalThis.__zod_globalRegistry;
-// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/api.js
+// ../../../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/api.js
 function _string(Class2, params) {
   return new Class2({
     type: "string",
@@ -4039,7 +4039,7 @@ function _check(fn, params) {
   ch._zod.check = fn;
   return ch;
 }
-// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/to-json-schema.js
+// ../../../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/to-json-schema.js
 function initializeContext(params) {
   let target = params?.target ?? "draft-2020-12";
   if (target === "draft-4")
@@ -4391,7 +4391,7 @@ var createStandardJSONSchemaMethod = (schema, io, processors = {}) => (params) =
   extractDefs(ctx, schema);
   return finalize(ctx, schema);
 };
-// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/json-schema-processors.js
+// ../../../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/core/json-schema-processors.js
 var formatMap = {
   guid: "uuid",
   url: "uri",
@@ -4710,7 +4710,7 @@ var optionalProcessor = (schema, ctx, _json, params) => {
   const seen = ctx.seen.get(schema);
   seen.ref = def.innerType;
 };
-// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/iso.js
+// ../../../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/iso.js
 var ZodISODateTime = /* @__PURE__ */ $constructor("ZodISODateTime", (inst, def) => {
   $ZodISODateTime.init(inst, def);
   ZodStringFormat.init(inst, def);
@@ -4740,7 +4740,7 @@ function duration2(params) {
   return _isoDuration(ZodISODuration, params);
 }
 
-// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/errors.js
+// ../../../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/errors.js
 var initializer2 = (inst, issues) => {
   $ZodError.init(inst, issues);
   inst.name = "ZodError";
@@ -4774,7 +4774,7 @@ var ZodRealError = /* @__PURE__ */ $constructor("ZodError", initializer2, {
   Parent: Error
 });
 
-// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/parse.js
+// ../../../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/parse.js
 var parse3 = /* @__PURE__ */ _parse(ZodRealError);
 var parseAsync2 = /* @__PURE__ */ _parseAsync(ZodRealError);
 var safeParse2 = /* @__PURE__ */ _safeParse(ZodRealError);
@@ -4788,7 +4788,7 @@ var safeDecode = /* @__PURE__ */ _safeDecode(ZodRealError);
 var safeEncodeAsync = /* @__PURE__ */ _safeEncodeAsync(ZodRealError);
 var safeDecodeAsync = /* @__PURE__ */ _safeDecodeAsync(ZodRealError);
 
-// ../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/schemas.js
+// ../../../../../node_modules/.bun/zod@4.4.3/node_modules/zod/v4/classic/schemas.js
 var _installedGroups = /* @__PURE__ */ new WeakMap;
 function _installLazyMethods(inst, group, methods) {
   const proto = Object.getPrototypeOf(inst);
@@ -5610,7 +5610,7 @@ function preprocess(fn, schema) {
   });
 }
 
-// ../../omo-config-core/src/schema/reasoning-vocabulary.ts
+// ../../../../omo-config-core/src/schema/reasoning-vocabulary.ts
 var REASONING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
 var REASONING_AUTO = "auto";
 var REASONING_LEVEL_SET = new Set(REASONING_LEVELS);
@@ -5648,7 +5648,7 @@ function splitReasoningSuffix(model, options) {
   return { base, level: token };
 }
 
-// ../../omo-config-core/src/schema/model-ref.ts
+// ../../../../omo-config-core/src/schema/model-ref.ts
 var REASONING_LEVELS_OR_AUTO = [...REASONING_LEVELS, "auto"];
 var OmoReasoningSchema = union([
   _enum(REASONING_LEVELS_OR_AUTO),
@@ -5664,7 +5664,7 @@ var OmoModelRefObjectSchema = object({
 }).strict();
 var OmoModelRefSchema = union([string2(), OmoModelRefObjectSchema]);
 
-// ../../omo-config-core/src/schema/fallback-models.ts
+// ../../../../omo-config-core/src/schema/fallback-models.ts
 var OmoThinkingConfigSchema = object({
   type: _enum(["enabled", "disabled"]),
   budgetTokens: number2().optional()
@@ -5745,7 +5745,7 @@ var OmoFallbackModelsSchema = union([
   array(union([string2(), OmoFallbackModelObjectSchema]))
 ]);
 
-// ../../omo-config-core/src/schema/agent.ts
+// ../../../../omo-config-core/src/schema/agent.ts
 function isRecord2(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -5771,7 +5771,7 @@ var OmoAgentDefInputSchema = object({
 var OmoAgentDefSchema = preprocess((value) => isRecord2(value) ? normalizeLegacyModelFields(value) : value, OmoAgentDefInputSchema);
 var OmoAgentsConfigSchema = record(string2(), OmoAgentDefSchema);
 
-// ../../omo-config-core/src/schema/category.ts
+// ../../../../omo-config-core/src/schema/category.ts
 function isRecord3(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -5800,12 +5800,12 @@ var OmoCategoryConfigObjectSchema = object({
 var OmoCategoryConfigSchema = preprocess((value) => isRecord3(value) ? normalizeLegacyModelFields(value) : value, OmoCategoryConfigObjectSchema);
 var OmoCategoriesConfigSchema = record(string2(), OmoCategoryConfigSchema);
 
-// ../../omo-config-core/src/schema/harness.ts
+// ../../../../omo-config-core/src/schema/harness.ts
 var HARNESS_IDS = ["codex", "opencode", "omo"];
 var OMO_CONFIG_HARNESS_IDS = ["opencode", "senpi", "codex"];
 var OmoHarnessIdSchema = _enum(OMO_CONFIG_HARNESS_IDS);
 
-// ../../omo-config-core/src/schema/codegraph.ts
+// ../../../../omo-config-core/src/schema/codegraph.ts
 var OmoCodegraphSettingsShape = {
   enabled: boolean2(),
   auto_provision: boolean2(),
@@ -5824,7 +5824,7 @@ var OmoCodegraphSettingsSchema = OmoCodegraphSettingsLayerSchema.extend({
   telemetry: boolean2().default(false)
 }).strict();
 
-// ../../omo-config-core/src/schema/git-master.ts
+// ../../../../omo-config-core/src/schema/git-master.ts
 var OmoGitMasterSettingsShape = {
   commit_footer: union([boolean2(), string2()]),
   include_co_authored_by: boolean2()
@@ -5835,7 +5835,7 @@ var OmoGitMasterSettingsSchema = OmoGitMasterSettingsLayerSchema.extend({
   include_co_authored_by: boolean2().default(true)
 }).strict();
 
-// ../../omo-config-core/src/schema/memory.ts
+// ../../../../omo-config-core/src/schema/memory.ts
 var OmoMemoryReflectionTriggerSchema = object({
   step_count: number2().int().nonnegative().default(25),
   on_compaction: boolean2().default(true)
@@ -5989,7 +5989,7 @@ var OmoMemorySettingsLayerSchema = object({
   agents: record(string2(), OmoMemoryAgentOverridesSchema).optional()
 }).strict();
 
-// ../../omo-config-core/src/schema/model-catalog.ts
+// ../../../../omo-config-core/src/schema/model-catalog.ts
 function isRecord4(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -6005,7 +6005,7 @@ var OmoModelCatalogEntryLayerInputSchema = OmoModelCatalogEntryInputSchema.parti
 var OmoModelCatalogEntryLayerSchema = preprocess((value) => isRecord4(value) ? normalizeLegacyModelFields(value) : value, OmoModelCatalogEntryLayerInputSchema);
 var OmoModelCatalogLayerSchema = record(string2(), OmoModelCatalogEntryLayerSchema);
 
-// ../../omo-config-core/src/schema/task.ts
+// ../../../../omo-config-core/src/schema/task.ts
 import { availableParallelism } from "node:os";
 var ResidencyMaxChildrenInputSchema = union([number2().int().nonnegative(), literal("unlimited")]);
 var OmoTaskWaitSchema = object({
@@ -6101,7 +6101,7 @@ function resolveOmoTaskSettings(input, resolveParallelism = availableParallelism
   });
 }
 
-// ../../omo-config-core/src/schema/team.ts
+// ../../../../omo-config-core/src/schema/team.ts
 var OmoTeamMemberBaseSchema = object({
   name: string2().min(1).regex(/^[a-z0-9-]+$/),
   cwd: string2().optional(),
@@ -6148,7 +6148,7 @@ var OmoTeamSpecLayerSchema = OmoTeamSpecBaseSchema.partial();
 var OmoTeamsConfigSchema = record(string2(), OmoTeamSpecSchema);
 var OmoTeamsConfigLayerSchema = record(string2(), OmoTeamSpecLayerSchema);
 
-// ../../omo-config-core/src/schema/telemetry.ts
+// ../../../../omo-config-core/src/schema/telemetry.ts
 var OmoTelemetrySettingsShape = {
   enabled: boolean2()
 };
@@ -6157,7 +6157,7 @@ var OmoTelemetrySettingsSchema = OmoTelemetrySettingsLayerSchema.extend({
   enabled: boolean2().default(true)
 }).strict();
 
-// ../../omo-config-core/src/schema/config.ts
+// ../../../../omo-config-core/src/schema/config.ts
 var OmoOpenCodeHarnessConfigSchema = record(string2(), unknown());
 var OmoTypedHarnessConfigSchema = object({
   categories: OmoCategoriesConfigSchema.optional(),
@@ -6221,7 +6221,7 @@ var OmoConfigLayerSchema = object({
   legacy_migrations: record(string2(), unknown()).optional()
 }).strict();
 
-// ../../../node_modules/.bun/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/impl/scanner.js
+// ../../../../../node_modules/.bun/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/impl/scanner.js
 function createScanner(text, ignoreTrivia = false) {
   const len = text.length;
   let pos = 0, value = "", tokenOffset = 0, token = 16, lineNumber = 0, lineStartOffset = 0, tokenLineStartOffset = 0, prevTokenLineStartOffset = 0, scanError = 0;
@@ -6636,7 +6636,7 @@ var CharacterCodes;
   CharacterCodes2[CharacterCodes2["tab"] = 9] = "tab";
 })(CharacterCodes || (CharacterCodes = {}));
 
-// ../../../node_modules/.bun/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/impl/string-intern.js
+// ../../../../../node_modules/.bun/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/impl/string-intern.js
 var cachedSpaces = new Array(20).fill(0).map((_, index) => {
   return " ".repeat(index);
 });
@@ -6673,7 +6673,7 @@ var supportedEols = [`
 `, "\r", `\r
 `];
 
-// ../../../node_modules/.bun/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/impl/format.js
+// ../../../../../node_modules/.bun/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/impl/format.js
 function format(documentText, range, options) {
   let initialIndentLevel;
   let formatText;
@@ -6913,7 +6913,7 @@ function isEOL(text, offset) {
 `.indexOf(text.charAt(offset)) !== -1;
 }
 
-// ../../../node_modules/.bun/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/impl/parser.js
+// ../../../../../node_modules/.bun/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/impl/parser.js
 var ParseOptions;
 (function(ParseOptions2) {
   ParseOptions2.DEFAULT = {
@@ -7325,7 +7325,7 @@ function getNodeType(value) {
   }
 }
 
-// ../../../node_modules/.bun/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/impl/edit.js
+// ../../../../../node_modules/.bun/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/impl/edit.js
 function setProperty(text, originalPath, value, options) {
   const path = originalPath.slice();
   const errors2 = [];
@@ -7469,7 +7469,7 @@ function applyEdit(text, edit) {
   return text.substring(0, edit.offset) + edit.content + text.substring(edit.offset + edit.length);
 }
 
-// ../../../node_modules/.bun/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/main.js
+// ../../../../../node_modules/.bun/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/main.js
 var ScanError;
 (function(ScanError2) {
   ScanError2[ScanError2["None"] = 0] = "None";
@@ -7581,7 +7581,7 @@ function applyEdits(text, edits) {
   return text;
 }
 
-// ../../omo-config-core/src/loader/merge.ts
+// ../../../../omo-config-core/src/loader/merge.ts
 var DANGEROUS_KEYS = new Set(["__proto__", "constructor", "prototype"]);
 function isUnsafeObjectKey(key) {
   return DANGEROUS_KEYS.has(key);
@@ -7617,16 +7617,16 @@ function mergeOmoConfigRecords(base, override, parentKey) {
   return result;
 }
 
-// ../../omo-config-core/src/loader/paths.ts
+// ../../../../omo-config-core/src/loader/paths.ts
 import { userInfo } from "node:os";
 import { dirname as dirname2, join as join7, posix, resolve as resolve3 } from "node:path";
 
-// ../../omo-config-core/src/internal/posix-path.ts
+// ../../../../omo-config-core/src/internal/posix-path.ts
 function toPosixPath(path) {
   return path.split("\\").join("/");
 }
 
-// ../../omo-config-core/src/loader/types.ts
+// ../../../../omo-config-core/src/loader/types.ts
 import { existsSync as existsSync4, lstatSync, readFileSync as readFileSync2, realpathSync as realpathSync2 } from "node:fs";
 var DEFAULT_READ_FILE_SYSTEM = {
   existsSync: existsSync4,
@@ -7635,7 +7635,7 @@ var DEFAULT_READ_FILE_SYSTEM = {
   realpathSync: realpathSync2
 };
 
-// ../../omo-config-core/src/loader/paths.ts
+// ../../../../omo-config-core/src/loader/paths.ts
 var MAX_PROJECT_CONFIG_DIRECTORY_DEPTH = 256;
 var ACCOUNT_HOME_DIR = userInfo().homedir;
 function resolveHomeDir(env = process.env) {
@@ -7720,7 +7720,7 @@ function resolveOmoConfigPaths(options) {
   ];
 }
 
-// ../../omo-config-core/src/loader/resolution.ts
+// ../../../../omo-config-core/src/loader/resolution.ts
 var HARNESS_KEYS = [...new Set([...HARNESS_IDS, ...OMO_CONFIG_HARNESS_IDS])].map((harness) => `[${harness}]`);
 function profileName(value) {
   return value === "" ? undefined : value;
@@ -7777,7 +7777,7 @@ function resolveOmoConfigView(options) {
   };
 }
 
-// ../../omo-config-core/src/loader/loader.ts
+// ../../../../omo-config-core/src/loader/loader.ts
 function parseJsoncSafe(content) {
   const errors2 = [];
   const data = parse5(content.charCodeAt(0) === 65279 ? content.slice(1) : content, errors2, {
@@ -7921,7 +7921,7 @@ function loadOmoConfig(options = {}) {
   };
 }
 
-// ../../omo-config-core/src/writer/types.ts
+// ../../../../omo-config-core/src/writer/types.ts
 import {
   copyFileSync,
   existsSync as existsSync5,
@@ -7960,11 +7960,11 @@ class OmoConfigWriteError extends Error {
   }
 }
 
-// ../../omo-config-core/src/writer/writer.ts
+// ../../../../omo-config-core/src/writer/writer.ts
 import { randomUUID as randomUUID2 } from "node:crypto";
 import { dirname as dirname3, join as join8, posix as posix2 } from "node:path";
 
-// ../../omo-config-core/src/internal/jsonc-parse.ts
+// ../../../../omo-config-core/src/internal/jsonc-parse.ts
 function stripBom(content) {
   return content.charCodeAt(0) === 65279 ? content.slice(1) : content;
 }
@@ -7984,7 +7984,7 @@ function parseJsoncSafe2(content) {
   };
 }
 
-// ../../omo-config-core/src/writer/writer.ts
+// ../../../../omo-config-core/src/writer/writer.ts
 var EMPTY_OMO_CONFIG = `// OMO configuration
 {
 }
@@ -8125,10 +8125,10 @@ function updateOmoConfig(options) {
   return backupPath === undefined ? { path } : { backupPath, path };
 }
 
-// ../../omo-config-core/src/migration/batch.ts
+// ../../../../omo-config-core/src/migration/batch.ts
 import { dirname as dirname5, posix as posix3 } from "node:path";
 
-// ../../omo-config-core/src/internal/plain-object.ts
+// ../../../../omo-config-core/src/internal/plain-object.ts
 var DANGEROUS_KEYS2 = new Set(["__proto__", "constructor", "prototype"]);
 function isUnsafeObjectKey2(key) {
   return DANGEROUS_KEYS2.has(key);
@@ -8137,7 +8137,7 @@ function isPlainObject3(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value) && Object.prototype.toString.call(value) === "[object Object]";
 }
 
-// ../../omo-config-core/src/migration/backup-move.ts
+// ../../../../omo-config-core/src/migration/backup-move.ts
 function isCrossDeviceError(error) {
   return error instanceof Error && Reflect.get(error, "code") === "EXDEV";
 }
@@ -8152,10 +8152,10 @@ function moveMigrationBackup(fileSystem, sourcePath, backupPath) {
   }
 }
 
-// ../../omo-config-core/src/migration/commit.ts
+// ../../../../omo-config-core/src/migration/commit.ts
 import { basename as basename3, dirname as dirname4, join as join9, resolve as resolve4 } from "node:path";
 
-// ../../omo-config-core/src/migration/merge.ts
+// ../../../../omo-config-core/src/migration/merge.ts
 function displayValue(value) {
   const encoded = JSON.stringify(value);
   return encoded === undefined ? String(value) : encoded;
@@ -8236,7 +8236,7 @@ function collectMigrationEdits(value, path = []) {
   return edits;
 }
 
-// ../../omo-config-core/src/migration/predicate.ts
+// ../../../../omo-config-core/src/migration/predicate.ts
 function hasMigrationMarker(target, migrationId) {
   const markers = target["_migrations"];
   return Array.isArray(markers) && markers.some((marker) => marker === migrationId);
@@ -8245,7 +8245,7 @@ function shouldRunMigration(input) {
   return input.legacySourcesExist && !hasMigrationMarker(input.target, input.migrationId);
 }
 
-// ../../omo-config-core/src/migration/types.ts
+// ../../../../omo-config-core/src/migration/types.ts
 class MigrationValidationError extends Error {
   targetPath;
   name = "MigrationValidationError";
@@ -8297,7 +8297,7 @@ var DEFAULT_MIGRATION_FILE_SYSTEM = {
   }
 };
 
-// ../../omo-config-core/src/migration/commit.ts
+// ../../../../omo-config-core/src/migration/commit.ts
 function parseDocument(path, content) {
   const parsed = parseJsoncSafe2(content);
   if (parsed.errors.length > 0 || !isPlainObject3(parsed.data)) {
@@ -8389,7 +8389,7 @@ function writePreparedTarget(input) {
   });
 }
 
-// ../../omo-config-core/src/migration/journal.ts
+// ../../../../omo-config-core/src/migration/journal.ts
 import { join as join10 } from "node:path";
 function migrationJournalPath(env) {
   return toPosixPath(join10(resolveHomeDir(env), ".omo", ".migration-journal.json"));
@@ -8479,7 +8479,7 @@ function removeMigrationJournal(fileSystem, env) {
     fileSystem.unlinkSync(path);
 }
 
-// ../../omo-config-core/src/migration/lock.ts
+// ../../../../omo-config-core/src/migration/lock.ts
 import { join as join11 } from "node:path";
 var DEFAULT_LEASE_DURATION_MS = 30000;
 var GUARD_LEASE_DURATION_MS = 1000;
@@ -8627,7 +8627,7 @@ function acquireMigrationLock(input) {
   return null;
 }
 
-// ../../omo-config-core/src/migration/recovery.ts
+// ../../../../omo-config-core/src/migration/recovery.ts
 function resumeMigrationJournal(input) {
   const journal = readMigrationJournal(input.fileSystem, input.env);
   if (journal === null)
@@ -8675,7 +8675,7 @@ function resumeMigrationJournal(input) {
   return true;
 }
 
-// ../../omo-config-core/src/migration/batch.ts
+// ../../../../omo-config-core/src/migration/batch.ts
 function parseSource(path, content) {
   const parsed = parseJsoncSafe2(content);
   if (parsed.errors.length > 0) {
@@ -8829,7 +8829,7 @@ function runMigrations(options) {
   }
 }
 
-// shared/src/config-migration.ts
+// ../../shared/src/config-migration.ts
 import { existsSync as existsSync6 } from "node:fs";
 import { posix as posix4, win32 } from "node:path";
 var MIGRATION_ID = "2026-07-codex-config-jsonc";
@@ -8939,7 +8939,7 @@ function runCodexConfigMigration(options) {
   }
 }
 
-// shared/src/config-loader.ts
+// ../../shared/src/config-loader.ts
 var ENV_BOOLEAN_SETTINGS = [
   ["auto_provision", "AUTO_PROVISION"],
   ["enabled", "ENABLED"],
@@ -9084,14 +9084,14 @@ function getCodexOmoConfig(options = {}) {
   };
 }
 
-// components/codegraph/src/mcp-bridge.ts
+// src/mcp-bridge.ts
 import { spawn } from "node:child_process";
 
-// ../../mcp-stdio-core/src/record.ts
+// ../../../../mcp-stdio-core/src/record.ts
 function isPlainRecord2(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
-// ../../mcp-stdio-core/src/responses.ts
+// ../../../../mcp-stdio-core/src/responses.ts
 function successResponse(id, result) {
   return { jsonrpc: "2.0", id, result };
 }
@@ -9104,7 +9104,7 @@ function jsonRpcId(value) {
 function messageFromError(error) {
   return error instanceof Error ? error.message : String(error);
 }
-// ../../mcp-stdio-core/src/transport.ts
+// ../../../../mcp-stdio-core/src/transport.ts
 var HEADER_SEPARATOR = Buffer.from(`\r
 \r
 `);
@@ -9245,7 +9245,7 @@ function bufferFromChunk(chunk) {
   throw new TypeError(`Unsupported stdio chunk type: ${typeof chunk}`);
 }
 
-// ../../mcp-stdio-core/src/server.ts
+// ../../../../mcp-stdio-core/src/server.ts
 var DEFAULT_IDLE_TIMEOUT_MS = 10 * 60000;
 var DEFAULT_PARENT_POLL_INTERVAL_MS = 30000;
 var noopLog = () => {};
@@ -9398,7 +9398,7 @@ function createIdleTimer(idleTimeoutMs, log, onTimeout) {
     }
   };
 }
-// components/codegraph/src/serve-invocation.ts
+// src/serve-invocation.ts
 import { extname } from "node:path";
 import { execPath as processExecPath } from "node:process";
 var WINDOWS_CMD_EXTENSIONS = new Set([".bat", ".cmd"]);
@@ -9416,7 +9416,7 @@ function resolveServeProcessInvocation(command, args, platform = process.platfor
   return { args: [...args], command };
 }
 
-// components/codegraph/src/mcp-bridge.ts
+// src/mcp-bridge.ts
 class CodegraphBridgeStdioError extends Error {
   streamName;
   name = "CodegraphBridgeStdioError";
@@ -9665,7 +9665,7 @@ async function writeLine(output, line) {
   });
 }
 
-// components/codegraph/src/mcp-unavailable.ts
+// src/mcp-unavailable.ts
 async function runUnavailableCodegraphMcpServer(options) {
   await runJsonRpcStdioServer({
     handler: handleUnavailableCodegraphMcpRequest,
@@ -9712,14 +9712,14 @@ function requestedProtocolVersion(params) {
   return params["protocolVersion"];
 }
 
-// components/codegraph/src/session-start-cooldown.ts
+// src/session-start-cooldown.ts
 var DEFAULT_SESSION_START_COOLDOWN_MS = 15 * 60 * 1000;
 var MAX_SESSION_START_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 
-// components/codegraph/src/session-start-worker.ts
+// src/session-start-worker.ts
 var SESSION_START_CWD_ENV = "OMO_CODEGRAPH_SESSION_START_CWD";
 
-// components/codegraph/src/serve.ts
+// src/serve.ts
 var CODEGRAPH_SKIP_HINT = `CodeGraph MCP skipped: codegraph binary not found. Install CodeGraph or set OMO_CODEGRAPH_BIN.
 `;
 var CODEGRAPH_DISABLED_HINT = `CodeGraph MCP skipped: disabled by OMO SOT config. Set [codex].codegraph.enabled=true to enable it.
